@@ -1,3 +1,4 @@
-amass/
+data/
 src/imu_uwb_pose/__pycache__/
 src/imu_uwb_pose.egg-info/
+body_models/
