@@ -4,6 +4,7 @@ import os
 
 import os
 import numpy as np
+import torch
 
 def process_amass():
     config = c.config()
@@ -40,20 +41,19 @@ def process_amass():
                     continue
 
                 # Process the data
-                output = de.extract(data, config)
+                output = de.extract_amass(data, config)
 
                 if output is None:
                     continue
                 
-                output = output.detach().cpu().numpy()
                 
                 # Save the data
                 save_dir = os.path.join(config.processed_pose, "AMASS", dataset, subject)
                 os.makedirs(save_dir, exist_ok=True)
 
                 # Save the processed output
-                save_path = os.path.join(save_dir, action)
-                np.savez_compressed(save_path, output)
+                save_path = os.path.join(save_dir, action.split(".")[0] + ".pt")
+                torch.save(output, save_path)
 
 
 

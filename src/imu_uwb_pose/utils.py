@@ -23,7 +23,7 @@ def forward_kinematics_R(R_local, parent):
     :param parent: Parent joint id list in shape [num_joint]. Use -1 or None for base id (parent[0]).
     :return: Joint global rotation, in shape [num_joint, 3, 3].
     """
-    R_local = R_local.view(-1, 24, 3, 3)
+    R_local = R_local.view(-1, 22, 3, 3)
     R_global = _forward_tree(R_local, parent, torch.bmm)
     return R_global
 
@@ -56,3 +56,28 @@ def get_parent_array(smpl_skeleton, config):
         parent[child_joint] = parent_joint
     
     return parent
+
+def default_smpl_input(batch_size, config):
+    '''
+    SMPL batching is setup strange and need to be instantiated on model creation instead of on forward pass unless all member variables are passed in.
+    This function creates a default input for SMPL model that can be modified as needed.
+    Makes a couple assumptions about the model namely 
+        num_expression_coefficients is set to 10 (the default)
+        num_betas is set to 10 (the default)
+        use_pca is set to true and num_pca_comps is set to 6 (the default)
+    '''
+    return {
+        'global_orient': torch.eye(3, device=config.device).view(
+                1, 1, 3, 3).expand(batch_size, -1, -1, -1).contiguous(),
+        'body_pose': torch.eye(3, device=config.device).view(
+                1, 1, 3, 3).expand(
+                    batch_size, 21, -1, -1).contiguous(),
+        'betas': torch.zeros((batch_size, 10)).to(config.device),
+        'transl': torch.zeros((batch_size, 3)).to(config.device),
+        'jaw_pose': torch.zeros((batch_size, 3)).to(config.device),
+        'left_hand_pose': torch.zeros((batch_size, 6)).to(config.device),
+        'right_hand_pose': torch.zeros((batch_size, 6)).to(config.device),
+        'expression': torch.zeros((batch_size, 10)).to(config.device),
+        'leye_pose': torch.zeros((batch_size, 3)).to(config.device),
+        'reye_pose': torch.zeros((batch_size, 3)).to(config.device),
+    }

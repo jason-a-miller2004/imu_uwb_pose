@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 import open3d as o3d
 import time
 
-def extract(cdata, config):
+def extract_amass(cdata, config):
     """
     Extract the data from the AMASS dataset
     """
@@ -22,7 +22,6 @@ def extract(cdata, config):
 
     pose = cdata['poses'][::step].astype(np.float32)
     tran = cdata['trans'][::step].astype(np.float32)
-    gender = cdata['gender'].item()
 
     # align AMASS global frame with a different orientation
     # right now set to no rotation
@@ -49,37 +48,36 @@ def extract(cdata, config):
     # (If needed, you can also send the tensor to the appropriate device.)
     pose[:, :3] = aligned_rotvec
 
-    time_length = pose.shape[0]
-    num_betas = 10 # number of body parameters
-
     body_parms = {
         'global_orient': torch.Tensor(pose[:, :3]).to(config.device), # controls the global root orientation
         'body_pose': torch.Tensor(pose[:, 3:66]).to(config.device), # controls the body
         'transl': torch.Tensor(tran).to(config.device), # controls the global body position
-        'betas': torch.Tensor(np.repeat(cdata['betas'][:num_betas][np.newaxis], repeats=time_length, axis=0)).to(config.device), # controls the body shape. Body shape is static
     }
 
+    smpl_params = utils.default_smpl_input(pose.shape[0], config)
+
+    for key in body_parms.keys():
+        smpl_params[key] = body_parms[key]
+
     smpl = smplx.create(config.body_model, model_type='smplx',
-                         gender=gender, use_face_contour=False,
-                         num_betas=10,
-                         batch_size=time_length,
+                         gender='neutral', use_face_contour=False,
+                         batch_size=1,
                          ext='npz',
                          age='adult').to(config.device)
     
-    output = smpl(**{k: v for k, v in body_parms.items()})
+    output = smpl(**{k: v for k, v in smpl_params.items()})
     
     # visualize output
-    vertices = output.vertices.detach().cpu().numpy()
-    faces = smpl.faces
-
     # uncomment if you want to see visualization of movement
+    # vertices = output.vertices.detach().cpu().numpy()
+    # faces = smpl.faces
     # visualize_smplx_mesh(vertices, faces)
 
-    uwb_distances = extract_uwb(output, config)
+    uwb_distances = extract_uwb_amass(output, config)
     print(f'UWB distances shape: {uwb_distances.shape}')
-    angles = extract_angle(pose, config)
+    angles = extract_angle_amass(pose, config)
     print(f'Angles shape: {angles.shape}')
-    floor_distances = extract_dist_floor(output, config)
+    floor_distances = extract_dist_floor_amass(output, config)
     print(f'Floor distances shape: {floor_distances.shape}')
 
     # Reshape angles from (frames, num_angles, 3) to (frames, num_angles * 3)
@@ -89,15 +87,24 @@ def extract(cdata, config):
     combined_features = torch.cat([angles_reshaped, uwb_distances, floor_distances], dim=1)
     print(f'Combined features shape: {combined_features.shape}')
 
-    return combined_features
+    params = torch.cat([body_parms['global_orient'], body_parms['body_pose'], body_parms['transl']], dim=1)
+
+    print(f'Params shape: {params.shape}')
+    print(f'Joints shape: {output.joints.shape}')
+    print()
+    return {
+        'x': combined_features.detach().cpu().type(torch.float32),
+        'y': params.detach().cpu().type(torch.float32),
+        'joints': output.joints.detach().cpu().type(torch.float32)[:, 0:22, :],
+    }
 
 
 
-def extract_angle(pose, config):
+def extract_angle_amass(pose, config):
     """
     Extract the angles from the AMASS dataset
     """
-    axis_angle_pose = pose[:,0:72].reshape(-1, 3)
+    axis_angle_pose = pose[:,0:66].reshape(-1, 3)
     
     # only keep body components
     rotation = R.from_rotvec(axis_angle_pose)
@@ -127,22 +134,22 @@ def extract_angle(pose, config):
     num_joints = len(absolute_joints)
     time_steps = selected_rotations_np.shape[0]
 
-    for joint_idx in range(num_joints):
-        plt.figure(figsize=(8, 5))
-        plt.plot(range(time_steps), selected_rotations_np[:, joint_idx, 0], label="X-axis")
-        plt.plot(range(time_steps), selected_rotations_np[:, joint_idx, 1], label="Y-axis")
-        plt.plot(range(time_steps), selected_rotations_np[:, joint_idx, 2], label="Z-axis")
+    # for joint_idx in range(num_joints):
+    #     plt.figure(figsize=(8, 5))
+    #     plt.plot(range(time_steps), selected_rotations_np[:, joint_idx, 0], label="X-axis")
+    #     plt.plot(range(time_steps), selected_rotations_np[:, joint_idx, 1], label="Y-axis")
+    #     plt.plot(range(time_steps), selected_rotations_np[:, joint_idx, 2], label="Z-axis")
 
-        plt.xlabel("Time Step")
-        plt.ylabel("Rotation (radians)")
-        plt.title(f"Joint {absolute_joints[joint_idx]} Rotation Over Time")
-        plt.legend()
-        plt.grid(True)
-        plt.show()
+    #     plt.xlabel("Time Step")
+    #     plt.ylabel("Rotation (radians)")
+    #     plt.title(f"Joint {absolute_joints[joint_idx]} Rotation Over Time")
+    #     plt.legend()
+    #     plt.grid(True)
+    #     plt.show()
 
     return selected_rotations
 
-def extract_uwb(output, config):
+def extract_uwb_amass(output, config):
     """
     Extract the UWB data from the AMASS dataset
     """
@@ -158,12 +165,12 @@ def extract_uwb(output, config):
     # Compute Euclidean distance: ||p1 - p2||_2
     uwb_distances = torch.norm(p1_positions - p2_positions, dim=2)  # Shape: (frames, num_dists)
 
-    plt.plot(uwb_distances.detach().cpu().numpy()[:, 0])
-    plt.title("UWB Distance Over Time")
+    # plt.plot(uwb_distances.detach().cpu().numpy()[:, 0])
+    # plt.title("UWB Distance Over Time")
 
     return uwb_distances  # Torch tensor of shape (frames, len(uwb_dists))
 
-def extract_dist_floor(output, config):
+def extract_dist_floor_amass(output, config):
     """
     Extract the distance from the floor data from the AMASS dataset
     """
@@ -176,9 +183,9 @@ def extract_dist_floor(output, config):
     dist_floor = root_position[:, :, 2]  # Shape: (frames,)
 
     # uncomment if you want to see distances to floor plotted for validity
-    plt.plot(dist_floor.detach().cpu().numpy()[:, 0])
-    plt.plot(dist_floor.detach().cpu().numpy()[:, 1])
-    plt.show()
+    # plt.plot(dist_floor.detach().cpu().numpy()[:, 0])
+    # plt.plot(dist_floor.detach().cpu().numpy()[:, 1])
+    # plt.show()
 
     return dist_floor  # Torch tensor of shape (frames,)
 
