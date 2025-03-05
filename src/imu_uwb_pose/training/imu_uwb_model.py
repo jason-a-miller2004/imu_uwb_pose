@@ -9,7 +9,6 @@ from .RNN import RNN
 from imu_uwb_pose import config
 from imu_uwb_pose.utils import default_smpl_input
 import smplx
-from tqdm import tqdm
 
 class imu_uwb_pose_model(pl.LightningModule):
     r"""
@@ -55,7 +54,6 @@ class imu_uwb_pose_model(pl.LightningModule):
         target = target_pose
         
         loss = self.loss(pred, target_pose)
-        print(f'loss: {loss}')
         loss += self.calculate_joint_loss(pred, target_joints, input_lengths)
         
         return loss, pred, target
@@ -75,9 +73,7 @@ class imu_uwb_pose_model(pl.LightningModule):
 
         pred_joints = pred_joints.reshape(batch_size, self.config.max_sample_length, -1, 3)
         
-
         loss = self.loss(pred_joints, target_joints)
-        print(f"joint loss: {loss}")
         return loss
 
     def training_step(self, batch, batch_idx):
