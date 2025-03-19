@@ -29,6 +29,7 @@ def get_dataset(config):
     if dataset == "amass_dataset":
         from imu_uwb_pose.training import amass_dataset as dataset
         train_dataset = dataset.amass_dataset(config)
+        test_dataset = dataset.amass_dataset(config, train=False)
     else:
         print("Enter a valid model")
         return
@@ -38,10 +39,6 @@ def get_dataset(config):
 
     # split the dataset
     train_dataset, val_dataset = torch.utils.data.random_split(train_dataset, [train_size, val_size])
-
-    val_size, test_size = train_val_split(val_dataset, train_pct=0.5)
-
-    val_dataset, test_dataset = torch.utils.data.random_split(val_dataset, [val_size, test_size])
 
     return train_dataset, test_dataset, val_dataset
 

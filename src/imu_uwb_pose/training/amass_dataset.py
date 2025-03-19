@@ -3,7 +3,8 @@ from torch.utils.data import Dataset
 import os
 
 class amass_dataset(Dataset):
-    def __init__(self, config):
+    def __init__(self, config, train=True):
+        self.train = train
         self.data = self.load_data(config)
         self.config = config
 
@@ -15,7 +16,7 @@ class amass_dataset(Dataset):
         y = []
         joints = []
 
-        dir = os.path.join(config.processed_pose, "AMASS")
+        dir = os.path.join(config.processed_pose, "AMASS", "train" if self.train else "test")
 
         for dataset in config.amass_datasets:
             dataset_dir = os.path.join(dir, dataset)

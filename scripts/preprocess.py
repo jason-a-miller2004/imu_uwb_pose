@@ -23,9 +23,14 @@ def process_amass():
         if not os.path.exists(dataset_path):
             continue
 
+        subject_count = 0
         subject_names = [s for s in os.listdir(dataset_path) if os.path.isdir(os.path.join(dataset_path, s))]
 
         for subject in subject_names:
+            data_location = 'train'
+            if (subject_count % 10) == 0:
+                data_location = 'test'
+            subject_count += 1
             subject_path = os.path.join(dataset_path, subject)
 
             action_files = [f for f in os.listdir(subject_path) if f.endswith(".npz")]
@@ -48,7 +53,7 @@ def process_amass():
                 
                 
                 # Save the data
-                save_dir = os.path.join(config.processed_pose, "AMASS", dataset, subject)
+                save_dir = os.path.join(config.processed_pose, "AMASS", data_location, dataset, subject)
                 os.makedirs(save_dir, exist_ok=True)
 
                 # Save the processed output
