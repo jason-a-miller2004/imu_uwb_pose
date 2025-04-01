@@ -4,3 +4,7 @@ src/imu_uwb_pose.egg-info/
 body_models/
 pose_models/
 src/imu_uwb_pose/training/__pycache__/
+lightning_logs/
+imu_uwb_pose/
+scripts/.ipynb_checkpoints/
+src/.ipynb_checkpoints/

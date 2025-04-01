@@ -93,6 +93,11 @@ class imu_uwb_pose_model(pl.LightningModule):
         loss, pred_pose, target_pose = self.step(batch)
         
         return {"loss": loss.item(), "pred": pred_pose, "true": target_pose}
+
+    def test_step(self, batch, batch_idx):
+        loss, preds, targets = self.step(batch)  # Reuse your existing 'step' logic
+        self.log('test_loss', loss, prog_bar=True)
+        return {"test_loss": loss}
     
     def on_validation_batch_end(self, outputs, batch, batch_idx, dataloader_idx=0):
         if outputs is not None:

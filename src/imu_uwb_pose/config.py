@@ -11,22 +11,24 @@ class config:
         self.experiment = experiment
         if self.experiment != None:
             datestring = datetime.datetime.now().strftime("%m%d%Y-%H%M%S")
-            self.checkpoint_path = self.root_dir / f"pose_models/checkpoints/{self.experiment}/{datestring}"
+            self.checkpoint_path = self.root_dir / f"pose_models/checkpoints/{self.experiment}"
             self.checkpoint_path.mkdir(exist_ok=True, parents=True)
         
     torch_seed = 42
-    amass_datasets = ['HumanEva']
-    raw_amass = './data/raw/amass'
-    processed_pose = './data/processed'
+    amass_datasets = ['ACCAD', 'BMLhandball', 'BMLmovi', 'CMU',
+                  'DanceDB', 'DFaust', 'EKUT', 'EyesJapanDataset', 'GRAB', 'HDM05', 'HUMAN4D', 'HumanEva', 'KIT', 'MoSh', 'PosePrior', 'SFU', 'SOMA', 'SSM', 'TCDHands', 'TotalCapture', 'Transitions']
+    
+    raw_amass = '../../data/raw/amass'
+    processed_pose = '../../data/processed'
     body_model = './body_models'
     absolute_joint_angles = [7, 8] # left and right joint angles
     uwb_dists = [(7,8)]
     uwb_floor_dists = [7,8]
-    train_pct = 0.8
+    train_pct = 0.9
 
     # done with 30 fps in mind. If fps is different, change this value
     max_sample_length = 150
-    batch_size = 8
+    batch_size = 128
 
     def get_smpl_skeleton(self):
         return torch.tensor([

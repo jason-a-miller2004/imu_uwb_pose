@@ -4,17 +4,19 @@ from scipy.spatial.transform import Rotation as R
 from imu_uwb_pose import utils
 import smplx
 from matplotlib import pyplot as plt
-import open3d as o3d
 import time
 
 def extract_amass(cdata, config):
     """
     Extract the data from the AMASS dataset
     """
-    if 'mocap_frame_rate' not in cdata:
+
+    if 'mocap_framerate' not in cdata:
+        print('does not contain mocap_framerate')
         return None
 
-    framerate = int(cdata['mocap_frame_rate'])
+    framerate = int(cdata['mocap_framerate'])
+    print(f'framerate {framerate}')
     if framerate == 120: step = 4
     elif framerate == 60 or framerate == 59: step = 2
     elif framerate == 30: step = 1
@@ -122,7 +124,7 @@ def extract_angle_amass(pose, config):
 
     selected_rotations = selected_rotations.reshape(-1,3,3)
     # convert back to axis-angle representation
-    selected_rotations = R.from_matrix(selected_rotations)
+    selected_rotations = R.from_matrix(selected_rotations.cpu().numpy())
     selected_rotations = selected_rotations.as_rotvec()
 
     selected_rotations = torch.tensor(selected_rotations.reshape(-1, len(absolute_joints), 3), device=config.device)
@@ -188,51 +190,3 @@ def extract_dist_floor_amass(output, config):
     # plt.show()
 
     return dist_floor  # Torch tensor of shape (frames,)
-
-
-def visualize_smplx_mesh(vertices_sequence, faces, delay=0.05):
-    """
-    Visualizes an SMPL-X mesh sequence with a dynamically positioned ground plane using Open3D.
-
-    Args:
-        vertices_sequence: np.ndarray of shape (num_frames, num_vertices, 3),
-                           containing 3D vertex positions over time.
-        faces: np.ndarray of shape (num_faces, 3), defining triangular faces.
-        plane_size: Float, size of the ground plane.
-        delay: Time delay between frames in seconds.
-    """
-    num_frames, num_vertices, _ = vertices_sequence.shape
-
-    # Create Open3D visualizer
-    vis = o3d.visualization.Visualizer()
-    vis.create_window()
-
-    # show coordinate axes
-    opt = vis.get_render_option()
-    opt.show_coordinate_frame = True
-    opt.background_color = np.asarray([0.5, 0.5, 0.5])
-
-    # Create and add coordinate frame object
-    coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.5, origin=[0, 0, 0])
-    vis.add_geometry(coordinate_frame)
-
-    # Create mesh object
-    mesh = o3d.geometry.TriangleMesh()
-    mesh.vertices = o3d.utility.Vector3dVector(vertices_sequence[0])  # Initial frame vertices
-    mesh.triangles = o3d.utility.Vector3iVector(faces)  # Mesh connectivity
-    mesh.compute_vertex_normals()
-    mesh.paint_uniform_color([0.6, 0.6, 0.6])  # Light gray mesh
-    vis.add_geometry(mesh)
-
-    # Animation loop
-    for frame in range(num_frames):
-        mesh.vertices = o3d.utility.Vector3dVector(vertices_sequence[frame])  # Update vertex positions
-        mesh.compute_vertex_normals()
-        vis.update_geometry(mesh)
-        
-        vis.poll_events()
-        vis.update_renderer()
-        time.sleep(delay)
-
-    vis.destroy_window()
-    

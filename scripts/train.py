@@ -13,7 +13,7 @@ from imu_uwb_pose.training import imu_uwb_model as model
 from imu_uwb_pose.training.utils import imu_uwb_data_module as imu_uwb_data_module
 
 
-config = c.config(experiment='imu_uwb_pose_amass', dataset='amass_dataset')
+config = c.config(experiment='amass_full_train_1', dataset='amass_dataset')
 
 if __name__ == "__main__":
     # set the random seed
