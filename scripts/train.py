@@ -13,7 +13,11 @@ from imu_uwb_pose.training import imu_uwb_model as model
 from imu_uwb_pose.training.utils import imu_uwb_data_module as imu_uwb_data_module
 
 
+<<<<<<< HEAD
 config = c.config(experiment='amass_full_train_1', dataset='amass_dataset')
+=======
+config = c.config(experiment='imu_uwb_pose_test_run', dataset='amass_dataset')
+>>>>>>> 2342a9893afad0bdbeb355d71bbf59d9c0fec9a8
 
 if __name__ == "__main__":
     # set the random seed
@@ -40,7 +44,7 @@ if __name__ == "__main__":
         accelerator = "cpu"
         devices = 1
 
-    trainer = pl.Trainer(fast_dev_run=False, logger=wandb_logger, max_epochs=1000, accelerator=accelerator, devices=devices,
+    trainer = pl.Trainer(fast_dev_run=True, logger=wandb_logger, max_epochs=1000, accelerator=accelerator, devices=devices,
                          callbacks=[early_stopping_callback, checkpoint_callback], deterministic=True)
 
     trainer.fit(model, datamodule=datamodule)
