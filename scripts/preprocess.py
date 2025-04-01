@@ -27,28 +27,14 @@ def process_amass():
         if not os.path.exists(dataset_path):
             continue
 
-<<<<<<< HEAD
-        
-
-=======
-        subject_count = 0
->>>>>>> 2342a9893afad0bdbeb355d71bbf59d9c0fec9a8
         subject_names = [s for s in os.listdir(dataset_path) if os.path.isdir(os.path.join(dataset_path, s))]
         subject_count = 0
 
         for subject in subject_names:
-<<<<<<< HEAD
-
-=======
->>>>>>> 2342a9893afad0bdbeb355d71bbf59d9c0fec9a8
             data_location = 'train'
             if (subject_count % 10) == 0:
                 data_location = 'test'
             subject_count += 1
-<<<<<<< HEAD
-            
-=======
->>>>>>> 2342a9893afad0bdbeb355d71bbf59d9c0fec9a8
             subject_path = os.path.join(dataset_path, subject)
 
             action_files = [f for f in os.listdir(subject_path) if f.endswith(".npz")]

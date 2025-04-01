@@ -30,10 +30,6 @@ def get_dataset(config):
         from imu_uwb_pose.training import amass_dataset as dataset
         train_dataset = dataset.amass_dataset(config)
         test_dataset = dataset.amass_dataset(config, train=False)
-<<<<<<< HEAD
-
-=======
->>>>>>> 2342a9893afad0bdbeb355d71bbf59d9c0fec9a8
     else:
         print("Enter a valid model")
         return
