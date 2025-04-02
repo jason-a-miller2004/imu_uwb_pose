@@ -77,19 +77,31 @@ def extract_amass(cdata, config):
 
     uwb_distances = extract_uwb_amass(output, config)
     print(f'UWB distances shape: {uwb_distances.shape}')
-    angles = extract_angle_amass(pose, config)
+    angles = extract_angle(pose, config)[:, :, :, 0:2].reshape(-1, len(config.absolute_joint_angles), 6)
     print(f'Angles shape: {angles.shape}')
-    floor_distances = extract_dist_floor_amass(output, config)
-    print(f'Floor distances shape: {floor_distances.shape}')
 
-    # Reshape angles from (frames, num_angles, 3) to (frames, num_angles * 3)
+    # Reshape angles from (frames, num_angles, 6) to (frames, num_angles * 6)
     angles_reshaped = angles.reshape(angles.shape[0], -1)
 
-    # concat so that the shape is (frames, (angle1, angle2, ..., uwb dist 1, uwb dist 2, ..., uwb1 to floor1, uwb2 to floor2))
-    combined_features = torch.cat([angles_reshaped, uwb_distances, floor_distances], dim=1)
+    # concat so that the shape is (frames, (angle1, angle2, ..., uwb dist 1, uwb dist 2))
+    combined_features = torch.cat([angles_reshaped, uwb_distances], dim=1)
     print(f'Combined features shape: {combined_features.shape}')
 
-    params = torch.cat([body_parms['global_orient'], body_parms['body_pose'], body_parms['transl']], dim=1)
+    # convert global orient and body pose to rotation matrix
+    rot_global_orient = R.from_rotvec(body_parms['global_orient'].reshape(-1, 3))
+    rot_body_pose = R.from_rotvec(body_parms['body_pose'].reshape(-1, 3))
+
+    # convert to rotation matrices
+    rot_global_orient = torch.tensor(rot_global_orient.as_matrix()).to(config.device)
+    rot_body_pose = torch.tensor(rot_body_pose.as_matrix()).to(config.device)
+
+    print(f'Rot global orient shape: {rot_global_orient.shape}')
+    print(f'Rot body pose shape: {rot_body_pose.shape}')
+
+    rot_global_orient = rot_global_orient[:, :, 0:2].reshape(-1, 1, 6)
+    rot_body_pose = rot_body_pose[:, :, 0:2].reshape(-1, 21, 6)
+
+    params = torch.cat([rot_global_orient, rot_body_pose], dim=1)
 
     print(f'Params shape: {params.shape}')
     print(f'Joints shape: {output.joints.shape}')
@@ -102,7 +114,7 @@ def extract_amass(cdata, config):
 
 
 
-def extract_angle_amass(pose, config):
+def extract_angle(pose, config, all=False):
     """
     Extract the angles from the AMASS dataset
     """
@@ -119,35 +131,13 @@ def extract_angle_amass(pose, config):
     # calculate the global angle
     global_rot = utils.forward_kinematics_R(r_matrix, parent)
 
-    absolute_joints = config.absolute_joint_angles
-    selected_rotations = global_rot[:, absolute_joints, :, :]
-
-    selected_rotations = selected_rotations.reshape(-1,3,3)
-    # convert back to axis-angle representation
-    selected_rotations = R.from_matrix(selected_rotations.cpu().numpy())
-    selected_rotations = selected_rotations.as_rotvec()
-
-    selected_rotations = torch.tensor(selected_rotations.reshape(-1, len(absolute_joints), 3), device=config.device)
-
-    # Convert to numpy for visualization
-    selected_rotations_np = selected_rotations.cpu().numpy()
-
-    # Plot each joint's three rotation components
-    num_joints = len(absolute_joints)
-    time_steps = selected_rotations_np.shape[0]
-
-    # for joint_idx in range(num_joints):
-    #     plt.figure(figsize=(8, 5))
-    #     plt.plot(range(time_steps), selected_rotations_np[:, joint_idx, 0], label="X-axis")
-    #     plt.plot(range(time_steps), selected_rotations_np[:, joint_idx, 1], label="Y-axis")
-    #     plt.plot(range(time_steps), selected_rotations_np[:, joint_idx, 2], label="Z-axis")
-
-    #     plt.xlabel("Time Step")
-    #     plt.ylabel("Rotation (radians)")
-    #     plt.title(f"Joint {absolute_joints[joint_idx]} Rotation Over Time")
-    #     plt.legend()
-    #     plt.grid(True)
-    #     plt.show()
+    if (not all):
+        absolute_joints = config.absolute_joint_angles
+        num_joints = len(absolute_joints)
+        selected_rotations = global_rot[:, absolute_joints, :, :]
+    else:
+        num_joints = 22
+        selected_rotations = global_rot
 
     return selected_rotations
 
@@ -172,21 +162,21 @@ def extract_uwb_amass(output, config):
 
     return uwb_distances  # Torch tensor of shape (frames, len(uwb_dists))
 
-def extract_dist_floor_amass(output, config):
-    """
-    Extract the distance from the floor data from the AMASS dataset
-    """
-    joints = output.joints  # Shape: (frames, 127, 3)
+# def extract_dist_floor_amass(output, config):
+#     """
+#     Extract the distance from the floor data from the AMASS dataset
+#     """
+#     joints = output.joints  # Shape: (frames, 127, 3)
 
-    # Get the root joint position
-    root_position = joints[:, config.uwb_floor_dists, :]  # Shape: (frames, 3)
+#     # Get the root joint position
+#     root_position = joints[:, config.uwb_floor_dists, :]  # Shape: (frames, 3)
 
-    # Compute the distance from the floor: z-coordinate of the root joint
-    dist_floor = root_position[:, :, 2]  # Shape: (frames,)
+#     # Compute the distance from the floor: z-coordinate of the root joint
+#     dist_floor = root_position[:, :, 2]  # Shape: (frames,)
 
-    # uncomment if you want to see distances to floor plotted for validity
-    # plt.plot(dist_floor.detach().cpu().numpy()[:, 0])
-    # plt.plot(dist_floor.detach().cpu().numpy()[:, 1])
-    # plt.show()
+#     # uncomment if you want to see distances to floor plotted for validity
+#     # plt.plot(dist_floor.detach().cpu().numpy()[:, 0])
+#     # plt.plot(dist_floor.detach().cpu().numpy()[:, 1])
+#     # plt.show()
 
-    return dist_floor  # Torch tensor of shape (frames,)
+#     return dist_floor  # Torch tensor of shape (frames,)

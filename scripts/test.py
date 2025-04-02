@@ -1,5 +1,6 @@
 import os
 import pytorch_lightning as pl
+import torch
 
 from imu_uwb_pose import config as c
 from imu_uwb_pose.training.imu_uwb_model import imu_uwb_pose_model
@@ -8,7 +9,7 @@ from imu_uwb_pose.training.utils import imu_uwb_data_module as imu_uwb_data_modu
 
 if __name__ == "__main__":
     # 1. Load config
-    config = c.config(experiment='imu_uwb_train', dataset='amass_dataset')
+    config = c.config(experiment='amass_full_train_1', dataset='amass_dataset')
 
     # 2. Read the best model path from best_model.txt
     best_model_txt_path = os.path.join(config.checkpoint_path, "best_model.txt")
@@ -16,8 +17,8 @@ if __name__ == "__main__":
         lines = f.readlines()
     best_model_path = lines[0].strip()
 
-    # 3. Load the best model
-    model = imu_uwb_pose_model.load_from_checkpoint(best_model_path)
+    # 3. Load the best model  
+    model = imu_uwb_pose_model.load_from_checkpoint(best_model_path, map_location=config.device, config=config)
 
     # 4. Instantiate the data module
     datamodule = imu_uwb_data_module(config)
@@ -32,8 +33,20 @@ if __name__ == "__main__":
 
     trainer = pl.Trainer(
         accelerator=accelerator,
-        devices=devices
+        devices=devices,
+        fast_dev_run=True,
     )
 
     # 6. Run test using the loaded model
-    trainer.test(model, datamodule=datamodule)
+    output = trainer.predict(model, datamodule=datamodule)
+
+    # run eval metrics on each output and optionally visualize
+    # save true and predicted values for first output
+    true = output[0]["true"]
+    pred = output[0]["pred"]
+    lengths = output[0]["lengths"]
+
+    # save the true and predicted values
+    torch.save(true, os.path.join('.', "true.pt"))
+    torch.save(pred, os.path.join('.', "pred.pt"))
+    torch.save(lengths, os.path.join('.', "lengths.pt"))

@@ -7,7 +7,7 @@ import torch
 import pytorch_lightning as pl
 from .RNN import RNN
 from imu_uwb_pose import config
-from imu_uwb_pose.utils import default_smpl_input
+from imu_uwb_pose.utils import default_smpl_input, r6d_to_axis_angle
 import smplx
 
 class imu_uwb_pose_model(pl.LightningModule):
@@ -16,11 +16,11 @@ class imu_uwb_pose_model(pl.LightningModule):
     """
     def __init__(self, config:config):
         super().__init__()
-        n_input = 3 * len(config.absolute_joint_angles) + len(config.uwb_dists) + len(config.uwb_floor_dists)
+        n_input = 6 * len(config.absolute_joint_angles) + len(config.uwb_dists)
 
-        n_output_joints = 23  # 21 joints + 1 (root) + 1 translation
+        n_output_joints = 22
         self.n_output_joints = n_output_joints
-        self.n_pose_output = n_output_joints * 3
+        self.n_pose_output = n_output_joints * 6
 
         n_output = self.n_pose_output
 
@@ -50,6 +50,7 @@ class imu_uwb_pose_model(pl.LightningModule):
         inputs, target_pose, target_joints, input_lengths, _ = batch
         
         pred = self(inputs, input_lengths)
+        pred = pred.reshape(-1, pred.shape[1], self.n_output_joints, 6)
         
         target = target_pose
         
@@ -63,12 +64,15 @@ class imu_uwb_pose_model(pl.LightningModule):
         if batch_size == 0:
             return torch.tensor(0.0, device=self.config.device)
 
-        pred_pose = pred_pose.reshape(-1, self.n_pose_output) 
+        # convert r6d to axis-angle
+        pred_pose = pred_pose.reshape(-1, 6)
+        pred_pose_aa = r6d_to_axis_angle(pred_pose)
+        pred_pose_aa = torch.tensor(pred_pose_aa.reshape(-1, self.n_output_joints * 3), dtype=torch.float32).to(self.config.device)
 
-        smpl_input = default_smpl_input(pred_pose.shape[0], self.config)
-        smpl_input['global_orient'] = pred_pose[:, :3]
-        smpl_input['body_pose'] = pred_pose[:, 3:66]
-        smpl_input['transl'] = pred_pose[:, 66:]
+        smpl_input = default_smpl_input(pred_pose_aa.shape[0], self.config)
+        smpl_input['global_orient'] = pred_pose_aa[:, :3]
+        smpl_input['body_pose'] = pred_pose_aa[:, 3:66]
+
         pred_joints = self.body_model(**smpl_input).joints[:, 0:22, :]
 
         pred_joints = pred_joints.reshape(batch_size, self.config.max_sample_length, -1, 3)
@@ -92,7 +96,7 @@ class imu_uwb_pose_model(pl.LightningModule):
     def predict_step(self, batch, batch_idx):
         loss, pred_pose, target_pose = self.step(batch)
         
-        return {"loss": loss.item(), "pred": pred_pose, "true": target_pose}
+        return {"loss": loss.item(), "pred": pred_pose, "true": target_pose, "lengths": batch[3]}
 
     def test_step(self, batch, batch_idx):
         loss, preds, targets = self.step(batch)  # Reuse your existing 'step' logic

@@ -49,7 +49,6 @@ class imu_uwb_data_module(pl.LightningDataModule):
 
     def setup(self, stage=None):
         self.train_dataset, self.test_dataset, self.val_dataset = get_dataset(self.config)
-        print("Done with setup")
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.config.batch_size, collate_fn=pad_seq, num_workers=8, shuffle=True)
