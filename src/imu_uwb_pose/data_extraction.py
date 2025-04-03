@@ -53,7 +53,7 @@ def extract_amass(cdata, config):
     body_parms = {
         'global_orient': torch.Tensor(pose[:, :3]).to(config.device), # controls the global root orientation
         'body_pose': torch.Tensor(pose[:, 3:66]).to(config.device), # controls the body
-        'transl': torch.Tensor(tran).to(config.device), # controls the global body position
+        # 'transl': torch.Tensor(tran).to(config.device), # controls the global body position
     }
 
     smpl_params = utils.default_smpl_input(pose.shape[0], config)
