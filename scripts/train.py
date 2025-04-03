@@ -72,11 +72,14 @@ if __name__ == "__main__":
         filename='epoch={epoch}-val_loss={validation_step_loss:.5f}'
     )
 
+    print('config device type ', config.device.type)
     if config.device.type == 'cuda':
         accelerator = "gpu"
+        print('using gpu')
         devices = [0]
     else:
         accelerator = "cpu"
+        print('using cpu')
         devices = 1
 
     trainer = pl.Trainer(

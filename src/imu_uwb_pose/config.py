@@ -5,7 +5,7 @@ import datetime
 import os.path as osp
 
 class config:
-    def __init__(self, experiment=None, dataset=None, data_loc='.'):
+    def __init__(self, experiment=None, dataset=None, data_loc='../..'):
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.root_dir = Path().absolute()
         self.dataset = dataset
