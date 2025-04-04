@@ -88,8 +88,8 @@ def extract_amass(cdata, config):
     print(f'Combined features shape: {combined_features.shape}')
 
     # convert global orient and body pose to rotation matrix
-    rot_global_orient = R.from_rotvec(body_parms['global_orient'].reshape(-1, 3))
-    rot_body_pose = R.from_rotvec(body_parms['body_pose'].reshape(-1, 3))
+    rot_global_orient = R.from_rotvec(body_parms['global_orient'].reshape(-1, 3).cpu())
+    rot_body_pose = R.from_rotvec(body_parms['body_pose'].reshape(-1, 3).cpu())
 
     # convert to rotation matrices
     rot_global_orient = torch.tensor(rot_global_orient.as_matrix()).to(config.device)
