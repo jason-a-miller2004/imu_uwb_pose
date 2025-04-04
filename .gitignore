@@ -11,3 +11,4 @@ src/.ipynb_checkpoints/
 lengths.pt
 pred.pt
 true.pt
+.venv

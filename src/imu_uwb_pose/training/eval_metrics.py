@@ -2,7 +2,7 @@ import imu_uwb_pose.data_extraction as de
 import imu_uwb_pose.config as c
 from imu_uwb_pose.utils import default_smpl_input, r6d_to_axis_angle
 from scipy.spatial.transform import Rotation as R
-import open3d as o3d
+# import open3d as o3d
 import numpy as np
 # import open3d as o3d
 import torch
@@ -248,74 +248,74 @@ def mean_per_joint_jitter(pred, lengths, config, translation=True):
 
     return np.mean(per_joint_jitter)
 
-def visualize(pred):
-        smpl_input = default_smpl_input(pred.shape[0], config)
+# def visualize(pred):
+#         smpl_input = default_smpl_input(pred.shape[0], config)
 
-        smpl_input['global_orient'] = pred[:, :3]
-        smpl_input['body_pose'] = pred[:, 3:66]
-        smpl_input['transl'] = pred[:, 66:]
+#         smpl_input['global_orient'] = pred[:, :3]
+#         smpl_input['body_pose'] = pred[:, 3:66]
+#         smpl_input['transl'] = pred[:, 66:]
 
-        output = body_model(**smpl_input)
-        vertices = output.vertices.detach().cpu().numpy()
-        faces = body_model.faces
+#         output = body_model(**smpl_input)
+#         vertices = output.vertices.detach().cpu().numpy()
+#         faces = body_model.faces
 
-        visualize_frames_open3d(vertices, faces, fps=30)
+#         visualize_frames_open3d(vertices, faces, fps=30)
 
-def visualize_frames_open3d(frames, faces, fps=120):
-    """
-    Visualize a list of (N, 3) point sets in an Open3D window as a mesh,
-    refreshing at the specified fps (default 120Hz).
+# def visualize_frames_open3d(frames, faces, fps=120):
+#     """
+#     Visualize a list of (N, 3) point sets in an Open3D window as a mesh,
+#     refreshing at the specified fps (default 120Hz).
 
-    Args:
-        frames (list or array-like): A sequence of arrays, each of shape (N, 3).
-                                     Each array in 'frames' represents the vertex
-                                     positions for that frame.
-        faces (array-like): An array of shape (M, 3), each row containing the vertex
-                            indices for one triangular face.
-        fps (int): Frames per second to update the visualization.
-    """
+#     Args:
+#         frames (list or array-like): A sequence of arrays, each of shape (N, 3).
+#                                      Each array in 'frames' represents the vertex
+#                                      positions for that frame.
+#         faces (array-like): An array of shape (M, 3), each row containing the vertex
+#                             indices for one triangular face.
+#         fps (int): Frames per second to update the visualization.
+#     """
 
-    # Create a TriangleMesh geometry
-    mesh = o3d.geometry.TriangleMesh()
+#     # Create a TriangleMesh geometry
+#     mesh = o3d.geometry.TriangleMesh()
 
-    # Create a Visualizer window
-    vis = o3d.visualization.Visualizer()
-    vis.create_window(window_name='Open3D Mesh', width=1280, height=720)
+#     # Create a Visualizer window
+#     vis = o3d.visualization.Visualizer()
+#     vis.create_window(window_name='Open3D Mesh', width=1280, height=720)
 
-    # Optionally add a coordinate frame (useful for reference)
-    coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(
-        size=0.5, origin=[0, 0, 0]
-    )
-    vis.add_geometry(coordinate_frame)
+#     # Optionally add a coordinate frame (useful for reference)
+#     coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(
+#         size=0.5, origin=[0, 0, 0]
+#     )
+#     vis.add_geometry(coordinate_frame)
 
-    # Add the initial mesh to the visualizer
-    vis.add_geometry(mesh)
+#     # Add the initial mesh to the visualizer
+#     vis.add_geometry(mesh)
 
-    # Calculate the time interval between frames
-    frame_interval = 1.0 / fps
+#     # Calculate the time interval between frames
+#     frame_interval = 1.0 / fps
 
-    mesh.triangles = o3d.utility.Vector3iVector(faces)
+#     mesh.triangles = o3d.utility.Vector3iVector(faces)
 
-    for i, frame_data in enumerate(frames):
-        # Update the mesh's vertices
-        mesh.vertices = o3d.utility.Vector3dVector(frame_data)
-        mesh.compute_vertex_normals()
+#     for i, frame_data in enumerate(frames):
+#         # Update the mesh's vertices
+#         mesh.vertices = o3d.utility.Vector3dVector(frame_data)
+#         mesh.compute_vertex_normals()
 
-        # Update geometry in the visualizer
-        vis.update_geometry(mesh)
-        vis.poll_events()
+#         # Update geometry in the visualizer
+#         vis.update_geometry(mesh)
+#         vis.poll_events()
 
-        # Optionally reset the viewpoint on the first frame
-        if i == 0:
-            vis.reset_view_point(True)
+#         # Optionally reset the viewpoint on the first frame
+#         if i == 0:
+#             vis.reset_view_point(True)
 
-        vis.update_renderer()
+#         vis.update_renderer()
 
-        # Wait briefly to maintain your desired fps
-        time.sleep(frame_interval)
+#         # Wait briefly to maintain your desired fps
+#         time.sleep(frame_interval)
 
-    # Once done, close the window
-    vis.destroy_window()
+#     # Once done, close the window
+#     vis.destroy_window()
 
 
 # convert pred and true to axis angle
