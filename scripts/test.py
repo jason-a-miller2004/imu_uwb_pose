@@ -85,25 +85,12 @@ if __name__ == "__main__":
         fast_dev_run=False,
     )
 
-    # -------------------------------------------------------------------------
-    # 7) Run prediction (in Lightning, `predict` returns the model outputs)
-    # -------------------------------------------------------------------------
-    print("Running model predictions on the test set...")
-    output = trainer.predict(model, datamodule=datamodule)
+print("Running model predictions on the test set...")
+outputs = trainer.predict(model, datamodule=datamodule)
 
-    # -------------------------------------------------------------------------
-    # 8) Post-processing: save or evaluate predictions
-    #    Here we assume the first element in `output` contains
-    #    "true", "pred", and "lengths" keys.
-    # -------------------------------------------------------------------------
-    true = output[0]["true"]
-    pred = output[0]["pred"]
-    lengths = output[0]["lengths"]
+torch.save(outputs, "outputs.pt")
 
-    # Save these tensors for further analysis
-    torch.save(true, "true.pt")
-    torch.save(pred, "pred.pt")
-    torch.save(lengths, "lengths.pt")
+print("Predictions saved to 'outputs.pt'.")
+print("Test run complete.")
 
-    print("Predictions saved to 'true.pt', 'pred.pt', and 'lengths.pt'.")
-    print("Test run complete.")
+

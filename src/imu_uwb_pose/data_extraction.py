@@ -53,7 +53,7 @@ def extract_amass(cdata, config):
     body_parms = {
         'global_orient': torch.Tensor(pose[:, :3]).to(config.device), # controls the global root orientation
         'body_pose': torch.Tensor(pose[:, 3:66]).to(config.device), # controls the body
-        'transl': torch.Tensor(tran).to(config.device), # controls the global body position
+        # 'transl': torch.Tensor(tran).to(config.device), # controls the global body position # uncomment to add back in translation
     }
 
     smpl_params = utils.default_smpl_input(pose.shape[0], config)
@@ -89,7 +89,7 @@ def extract_amass(cdata, config):
     combined_features = torch.cat([angles_reshaped, uwb_distances, floor_distances], dim=1)
     print(f'Combined features shape: {combined_features.shape}')
 
-    params = torch.cat([body_parms['global_orient'], body_parms['body_pose'], body_parms['transl']], dim=1)
+    params = torch.cat([body_parms['global_orient'], body_parms['body_pose']], dim=1)
 
     print(f'Params shape: {params.shape}')
     print(f'Joints shape: {output.joints.shape}')
