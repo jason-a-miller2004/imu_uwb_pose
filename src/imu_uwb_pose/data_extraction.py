@@ -102,7 +102,7 @@ def extract_amass(cdata, config):
 
 
 
-def extract_angle_amass(pose, config):
+def extract_angle_amass(pose, config, all=False):
     """
     Extract the angles from the AMASS dataset
     """
@@ -119,21 +119,25 @@ def extract_angle_amass(pose, config):
     # calculate the global angle
     global_rot = utils.forward_kinematics_R(r_matrix, parent)
 
-    absolute_joints = config.absolute_joint_angles
-    selected_rotations = global_rot[:, absolute_joints, :, :]
+    if (not all):
+        absolute_joints = config.absolute_joint_angles
+        selected_rotations = global_rot[:, absolute_joints, :, :]
+        num_joints = len(absolute_joints)
+    else:
+        selected_rotations = global_rot[:, :22, :, :]
+        num_joints = 22
 
     selected_rotations = selected_rotations.reshape(-1,3,3)
     # convert back to axis-angle representation
     selected_rotations = R.from_matrix(selected_rotations.cpu().numpy())
     selected_rotations = selected_rotations.as_rotvec()
 
-    selected_rotations = torch.tensor(selected_rotations.reshape(-1, len(absolute_joints), 3), device=config.device)
+    selected_rotations = torch.tensor(selected_rotations.reshape(-1, num_joints, 3), device=config.device)
 
     # Convert to numpy for visualization
     selected_rotations_np = selected_rotations.cpu().numpy()
 
     # Plot each joint's three rotation components
-    num_joints = len(absolute_joints)
     time_steps = selected_rotations_np.shape[0]
 
     # for joint_idx in range(num_joints):

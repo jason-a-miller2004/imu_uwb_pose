@@ -56,7 +56,7 @@ class imu_uwb_pose_model(pl.LightningModule):
         loss = self.loss(pred, target_pose)
         loss += self.calculate_joint_loss(pred, target_joints, input_lengths)
         
-        return loss, pred, target
+        return loss, pred, target, input_lengths
 
     def calculate_joint_loss(self, pred_pose, target_joints, lens):
         batch_size = len(target_joints)
@@ -77,25 +77,25 @@ class imu_uwb_pose_model(pl.LightningModule):
         return loss
 
     def training_step(self, batch, batch_idx):
-        loss, _, _ = self.step(batch)
+        loss, _, _,_ = self.step(batch)
         
         self.log("training_step_loss", loss.item(), batch_size=self.batch_size)
         return {"loss": loss}
 
     def validation_step(self, batch, batch_idx):
-        loss, _, _ = self.step(batch)
+        loss, _, _,_ = self.step(batch)
         
         self.log("validation_step_loss", loss.item(), batch_size=self.batch_size)
         self.validation_step_outputs.append({"loss": loss.item()})  # Collect outputs manually
         return {"loss": loss}
 
     def predict_step(self, batch, batch_idx):
-        loss, pred_pose, target_pose = self.step(batch)
+        loss, pred_pose, target_pose, lengths = self.step(batch)
         
-        return {"loss": loss.item(), "pred": pred_pose, "true": target_pose}
+        return {"loss": loss.item(), "pred": pred_pose, "true": target_pose, "lengths": lengths}
 
     def test_step(self, batch, batch_idx):
-        loss, preds, targets = self.step(batch)  # Reuse your existing 'step' logic
+        loss, preds, targets,_ = self.step(batch)  # Reuse your existing 'step' logic
         self.log('test_loss', loss, prog_bar=True)
         return {"test_loss": loss}
     
