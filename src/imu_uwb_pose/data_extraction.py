@@ -98,7 +98,7 @@ def extract_amass(cdata, config):
     print(f'Combined features shape: {combined_features.shape}')
 
     # convert global orient and body pose to r6d
-    global_r6d = utils.axis_angle_to_r6d(body_parms['global_orient'])
+    global_r6d = utils.axis_angle_to_r6d(body_parms['global_orient']).reshape(-1, 1, 6)
 
     body_pose = body_parms['body_pose'].reshape(-1, 3)
     body_r6d = utils.axis_angle_to_r6d(body_pose)
