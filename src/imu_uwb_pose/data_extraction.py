@@ -101,7 +101,7 @@ def extract_amass(cdata, config):
     global_r6d = utils.axis_angle_to_r6d(body_parms['global_orient'])
 
     body_pose = body_parms['body_pose'].reshape(-1, 3)
-    body_r6d = utils.axis_angle_to_r6d(body_parms['body_pose'])
+    body_r6d = utils.axis_angle_to_r6d(body_pose)
     body_r6d = body_r6d.reshape(-1, 21, 6)
 
     params = torch.cat([global_r6d, body_r6d], dim=1)
