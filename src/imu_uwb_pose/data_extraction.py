@@ -86,7 +86,7 @@ def extract_amass(cdata, config):
     num_angles = angles.shape[1]
     angles = angles.reshape(-1, 3)
     angles = utils.axis_angle_to_r6d(angles)
-    angles.reshape(-1, num_angles, 6)
+    angles = angles.reshape(-1, num_angles, 6)
 
     print(f'Angles shape after conversion: {angles.shape}')
 
