@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from scipy.spatial.transform import Rotation as R
 
 def forward_kinematics_R(R_local, parent):
     r"""
@@ -81,3 +82,91 @@ def default_smpl_input(batch_size, config):
         'leye_pose': torch.zeros((batch_size, 3)).to(config.device),
         'reye_pose': torch.zeros((batch_size, 3)).to(config.device),
     }
+
+def r6d_to_axis_angle(r6d: torch.Tensor) -> np.ndarray:
+    """
+    Converts a 6D rotation representation (batch_size x 6) to axis-angle (batch_size x 3).
+    
+    Args:
+        r6d: (B, 6) tensor. Each row is [v1, v2] where v1, v2 are in R^3.
+             Typically these come from the first two columns of a rotation matrix 
+             or something that can be orthonormalized into a rotation.
+    
+    Returns:
+        axis_angles: (B, 3) NumPy array of axis-angle rotations (in radians).
+                     Each row is an axis scaled by the rotation magnitude.
+    """
+    rot_mats = r6d_to_rotation_matrix(r6d)
+    
+    # 5) Convert rotation matrices to axis-angle (in radians) via SciPy
+
+    # convert to numpy and then to scipy rotation
+    rot_obj = R.from_matrix(rot_mats.detach().cpu().numpy())
+    # convert to axis-angle
+    aa = rot_obj.as_rotvec()  # shape (B,3)
+    
+    return aa
+
+def r6d_to_rotation_matrix(r6d: torch.Tensor) -> np.ndarray:
+    assert r6d.shape[1] == 6, "r6d must have shape (B,6)."
+    v1 = r6d[:, 0:3]  # (B,3)
+    v2 = r6d[:, 3:6]  # (B,3)
+    
+    # 1) Normalize v1
+    v1_norm = torch.nn.functional.normalize(v1, dim=1)  # (B,3)
+    
+    # 2) Make v2 orthogonal to v1
+    dot = torch.sum(v2 * v1_norm, dim=1, keepdim=True)  # (B,1)
+    proj = dot * v1_norm                                # (B,3)
+    v2_ortho = v2 - proj                                # (B,3)
+    v2_norm = torch.nn.functional.normalize(v2_ortho, dim=1)  # (B,3)
+    
+    # 3) Compute the 3rd orthonormal vector by cross product
+    v3_norm = torch.cross(v1_norm, v2_norm, dim=1)  # (B,3)
+    
+    # 4) Stack columns to get rotation matrices (B,3,3)
+    #    Each slice is a valid rotation matrix if v1, v2 were not degenerate
+    rot_mats = torch.stack([v1_norm, v2_norm, v3_norm], dim=2)  # (B,3,3)
+    return rot_mats
+
+def rotation_matrix_to_r6d(rot_mats: torch.Tensor) -> np.ndarray:
+    """
+    Converts rotation matrices (batch_size x 3 x 3) to 6D representation (batch_size x 6).
+    
+    Args:
+        rot_mats: (B, 3, 3) tensor. Each slice is a rotation matrix.
+    
+    Returns:
+        r6d: (B, 6) NumPy array of 6D representations.
+             Each row is [v1, v2] where v1, v2 are in R^3.
+    """
+    assert rot_mats.shape[1:] == (3, 3), "rot_mats must have shape (B,3,3)."
+    
+    # Extract the first two columns of the rotation matrix
+    v1 = rot_mats[:, :, 0]  # (B,3)
+    v2 = rot_mats[:, :, 1]  # (B,3)
+    
+    # Stack them to form the 6D representation
+    r6d = torch.cat([v1, v2], dim=1)  # (B,6)
+    
+    return r6d
+
+def axis_angle_to_r6d(axis_angles: torch.Tensor) -> np.ndarray:
+    """
+    Converts axis-angle (batch_size x 3) to 6D representation (batch_size x 6).
+    
+    Args:
+        axis_angles: (B, 3) tensor. Each row is an axis scaled by the rotation magnitude.
+    
+    Returns:
+        r6d: (B, 6) NumPy array of 6D representations.
+             Each row is [v1, v2] where v1, v2 are in R^3.
+    """
+    assert axis_angles.shape[1] == 3, "axis_angles must have shape (B,3)."
+    
+    angles_rot = R.from_rotvec(axis_angles.cpu().numpy())
+    # Convert to rotation matrices
+    rot_mats = angles_rot.as_matrix()  # shape (B,3,3)
+    # Convert to 6D representation
+    r6d = rotation_matrix_to_r6d(torch.tensor(rot_mats, device=axis_angles.device))
+    return r6d
