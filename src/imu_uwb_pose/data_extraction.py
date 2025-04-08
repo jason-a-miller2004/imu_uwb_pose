@@ -82,14 +82,29 @@ def extract_amass(cdata, config):
     floor_distances = extract_dist_floor_amass(output, config)
     print(f'Floor distances shape: {floor_distances.shape}')
 
-    # Reshape angles from (frames, num_angles, 3) to (frames, num_angles * 3)
+    # convert angles from axis-angle to r6d
+    num_angles = angles.shape[1]
+    angles = angles.reshape(-1, 3)
+    angles = utils.r6d_to_axis_angle(angles)
+    angles.reshape(-1, num_angles, 6)
+
+    print(f'Angles shape after conversion: {angles.shape}')
+
+    # Reshape angles from (frames, num_angles, 6) to (frames, num_angles * 6)
     angles_reshaped = angles.reshape(angles.shape[0], -1)
 
     # concat so that the shape is (frames, (angle1, angle2, ..., uwb dist 1, uwb dist 2, ..., uwb1 to floor1, uwb2 to floor2))
     combined_features = torch.cat([angles_reshaped, uwb_distances, floor_distances], dim=1)
     print(f'Combined features shape: {combined_features.shape}')
 
-    params = torch.cat([body_parms['global_orient'], body_parms['body_pose']], dim=1)
+    # convert global orient and body pose to r6d
+    global_r6d = utils.axis_angle_to_r6d(body_parms['global_orient'])
+
+    body_pose = body_parms['body_pose'].reshape(-1, 3)
+    body_r6d = utils.axis_angle_to_r6d(body_parms['body_pose'])
+    body_r6d = body_r6d.reshape(-1, 21, 6)
+
+    params = torch.cat([global_r6d, body_r6d], dim=1)
 
     print(f'Params shape: {params.shape}')
     print(f'Joints shape: {output.joints.shape}')
