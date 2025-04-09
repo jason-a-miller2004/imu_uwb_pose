@@ -153,12 +153,12 @@ def r6d_to_rotation_matrix(r6d: torch.Tensor, eps: float = 1e-8) -> torch.Tensor
     # 5) Stack columns to get rotation matrices (B,3,3)
     rot_mats = torch.stack([v1_norm, v2_norm, v3_norm], dim=2)  # (B,3,3)
     
-    # 6) Fix any that turned out left-handed by flipping the 3rd column
-    #    i.e., if det < 0, multiply the third column by -1
+    # 6) Fix any that turned out left-handed by setting to identity matrix
     dets = torch.det(rot_mats)
     mask = dets < 0
     if mask.any():
-        rot_mats[mask, :, 2] *= -1
+        print(f'Warning: {mask.sum()} matrices were left-handed and set to identity.')
+        rot_mats[mask, :, :] = torch.eye(3, device=rot_mats.device)
     
     return rot_mats
 
