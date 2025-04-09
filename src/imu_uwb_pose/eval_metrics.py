@@ -111,8 +111,8 @@ def mean_joint_and_vertex_error(pred, gt, lengths, config, translation=True):
     """
 
     # 1) Reshape for SMPL input (if not already flattened)
-    pred = pred.reshape(-1, 23, 3)   # => (B*max_length, 23, 3)
-    gt   = gt.reshape(-1, 23, 3)
+    pred = pred.reshape(-1, 22, 3)   # => (B*max_length, 23, 3)
+    gt   = gt.reshape(-1, 22, 3)
 
     # 2) Prepare SMPL input
     smpl_input = default_smpl_input(pred.shape[0], config)
@@ -120,7 +120,6 @@ def mean_joint_and_vertex_error(pred, gt, lengths, config, translation=True):
     # ----------------- Forward pass for predicted -----------------
     smpl_input['global_orient'] = pred[:, 0, :].to(config.device)      # (B*F, 3)
     smpl_input['body_pose']     = pred[:, 1:22, :].to(config.device)   # (B*F, 21, 3)
-    smpl_input['trans']         = pred[:, -1, :].to(config.device)
 
     pred_output = body_model(**smpl_input)
     pred_joints = pred_output.joints[:, 0:22, :].cpu().numpy()     # shape (B*F, 22, 3)
@@ -129,7 +128,6 @@ def mean_joint_and_vertex_error(pred, gt, lengths, config, translation=True):
     # ----------------- Forward pass for GT -----------------
     smpl_input['global_orient'] = gt[:, 0, :].to(config.device)
     smpl_input['body_pose']     = gt[:, 1:22, :].to(config.device)
-    smpl_input['trans']         = gt[: -1, :].to(config.device)
 
     gt_output   = body_model(**smpl_input)
     gt_joints   = gt_output.joints[:, 0:22, :].cpu().numpy()   # shape (B*F, 22, 3)
@@ -190,7 +188,7 @@ def mean_joint_and_vertex_error(pred, gt, lengths, config, translation=True):
 
     return mpjpe_cm, mpjve_cm
 
-def mean_per_joint_jitter(pred, lengths, config, translation=True):
+def mean_per_joint_jitter(pred, lengths, config):
     """
     Computes the *average jerk* (3rd derivative) for each of the 22 body joints
     in the SMPL model. Returns an array of shape (22,) with the mean jerk magnitude
@@ -200,14 +198,12 @@ def mean_per_joint_jitter(pred, lengths, config, translation=True):
     """
     # 1) Reshape so we can feed SMPL
     #    Suppose pred originally (B, max_length, 23, 3) => flatten => (B*max_length, 23, 3)
-    pred = pred.reshape(-1, 23, 3)
+    pred = pred.reshape(-1, 22, 3)
 
     # 2) SMPL forward pass
     smpl_input = default_smpl_input(pred.shape[0], config)
     smpl_input['global_orient'] = pred[:, 0, :].to(config.device)
     smpl_input['body_pose']     = pred[:, 1:22, :].to(config.device)
-    if translation:
-        smpl_input['transl'] = pred[:, 22, :].to(config.device)
 
     pred_output = body_model(**smpl_input)
     # shape => (B*max_length, 49, 3) or so; we'll slice 0:22
@@ -328,12 +324,12 @@ vertex_error = 0.0
 jitter = 0.0
 
 for i in range(len(outputs)):
-    pred = outputs[i]['pred'].reshape(-1, config.max_sample_length, 23, 3)
-    true = outputs[i]['true'].reshape(-1, config.max_sample_length, 23, 3)
+    pred = outputs[i]['pred'].reshape(-1, config.max_sample_length, 22, 3)
+    true = outputs[i]['true'].reshape(-1, config.max_sample_length, 22, 3)
     lengths = outputs[i]['lengths']
     print(f'processing output {i} pred shape {pred.shape} true shape {true.shape}')
 
-    mean_angle_error = mean_joint_angle_error(pred[:, :, :22, :], true[:, :, :22, :], lengths, config)
+    mean_angle_error = mean_joint_angle_error(pred, true, lengths, config)
     angle_error += mean_angle_error
     print('angle error ', mean_angle_error)
     
@@ -343,7 +339,7 @@ for i in range(len(outputs)):
     print('joint error ', mean_joint_error)
     print('vertex error ', mean_vertex_error)
 
-    mean_jitter = mean_per_joint_jitter(pred, lengths, config, translation=True)
+    mean_jitter = mean_per_joint_jitter(pred, lengths, config)
     jitter += mean_jitter
     print('mean per joint jitter ', mean_jitter)
     print()

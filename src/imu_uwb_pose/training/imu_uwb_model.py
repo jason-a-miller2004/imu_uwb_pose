@@ -18,7 +18,7 @@ class imu_uwb_pose_model(pl.LightningModule):
         super().__init__()
         n_input = 3 * len(config.absolute_joint_angles) + len(config.uwb_dists) + len(config.uwb_floor_dists)
 
-        n_output_joints = 23  # 21 joints + 1 (root) + 1 translation
+        n_output_joints = 22 # change back to 23 to add back translation
         self.n_output_joints = n_output_joints
         self.n_pose_output = n_output_joints * 3
 
@@ -68,7 +68,7 @@ class imu_uwb_pose_model(pl.LightningModule):
         smpl_input = default_smpl_input(pred_pose.shape[0], self.config)
         smpl_input['global_orient'] = pred_pose[:, :3]
         smpl_input['body_pose'] = pred_pose[:, 3:66]
-        smpl_input['transl'] = pred_pose[:, 66:]
+        # smpl_input['transl'] = pred_pose[:, 66:]
         pred_joints = self.body_model(**smpl_input).joints[:, 0:22, :]
 
         pred_joints = pred_joints.reshape(batch_size, self.config.max_sample_length, -1, 3)
