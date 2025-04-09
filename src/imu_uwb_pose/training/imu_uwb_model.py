@@ -7,7 +7,7 @@ import torch
 import pytorch_lightning as pl
 from .RNN import RNN
 from imu_uwb_pose import config
-from imu_uwb_pose.utils import default_smpl_input
+from imu_uwb_pose.utils import default_smpl_input, r6d_to_axis_angle
 import smplx
 
 class imu_uwb_pose_model(pl.LightningModule):
@@ -16,11 +16,11 @@ class imu_uwb_pose_model(pl.LightningModule):
     """
     def __init__(self, config:config):
         super().__init__()
-        n_input = 3 * len(config.absolute_joint_angles) + len(config.uwb_dists) + len(config.uwb_floor_dists)
+        n_input = 6 * len(config.absolute_joint_angles) + len(config.uwb_dists) + len(config.uwb_floor_dists)
 
         n_output_joints = 22 # change back to 23 to add back translation
         self.n_output_joints = n_output_joints
-        self.n_pose_output = n_output_joints * 3
+        self.n_pose_output = n_output_joints * 6
 
         n_output = self.n_pose_output
 
@@ -63,7 +63,10 @@ class imu_uwb_pose_model(pl.LightningModule):
         if batch_size == 0:
             return torch.tensor(0.0, device=self.config.device)
 
-        pred_pose = pred_pose.reshape(-1, self.n_pose_output) 
+        # convert back to axis-angle format
+        pred_pose = pred_pose.reshape(batch_size * self.n_output_joints, 6)
+        pred_pose = r6d_to_axis_angle(pred_pose)
+        pred_pose = pred_pose.reshape(batch_size, self.n_output_joints * 3)
 
         smpl_input = default_smpl_input(pred_pose.shape[0], self.config)
         smpl_input['global_orient'] = pred_pose[:, :3]
