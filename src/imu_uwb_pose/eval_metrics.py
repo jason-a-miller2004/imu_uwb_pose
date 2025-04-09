@@ -1,6 +1,6 @@
 import imu_uwb_pose.data_extraction as de
 import imu_uwb_pose.config as c
-from imu_uwb_pose.utils import default_smpl_input
+from imu_uwb_pose.utils import default_smpl_input, r6d_to_axis_angle
 from scipy.spatial.transform import Rotation as R
 # import open3d as o3d
 import numpy as np
@@ -324,8 +324,15 @@ vertex_error = 0.0
 jitter = 0.0
 
 for i in range(len(outputs)):
-    pred = outputs[i]['pred'].reshape(-1, config.max_sample_length, 22, 3)
-    true = outputs[i]['true'].reshape(-1, config.max_sample_length, 22, 3)
+    # convert pred and true to axis angle
+    pred_r6d = outputs[i]['pred'].reshape(-1, 6)
+    true_r6d = outputs[i]['true'].reshape(-1, 6)
+
+    pred_aa = torch.tensor(r6d_to_axis_angle(pred_r6d), dtype=torch.float32).to(config.device)
+    true_aa = torch.tensor(r6d_to_axis_angle(true_r6d), dtype=torch.float32).to(config.device)
+
+    pred = pred_aa.reshape(-1, config.max_sample_length, 22, 3)
+    true = true_aa.reshape(-1, config.max_sample_length, 22, 3)
     lengths = outputs[i]['lengths']
     print(f'processing output {i} pred shape {pred.shape} true shape {true.shape}')
 
