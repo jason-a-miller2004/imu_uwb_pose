@@ -107,60 +107,35 @@ def r6d_to_axis_angle(r6d: torch.Tensor) -> np.ndarray:
     
     return aa
 
-# def r6d_to_rotation_matrix(r6d: torch.Tensor) -> np.ndarray:
-#     assert r6d.shape[1] == 6, "r6d must have shape (B,6)."
-#     v1 = r6d[:, 0:3]  # (B,3)
-#     v2 = r6d[:, 3:6]  # (B,3)
-    
-#     # 1) Normalize v1
-#     v1_norm = torch.nn.functional.normalize(v1, dim=1)  # (B,3)
-    
-#     # 2) Make v2 orthogonal to v1
-#     dot = torch.sum(v2 * v1_norm, dim=1, keepdim=True)  # (B,1)
-#     proj = dot * v1_norm                                # (B,3)
-#     v2_ortho = v2 - proj                                # (B,3)
-#     v2_norm = torch.nn.functional.normalize(v2_ortho, dim=1)  # (B,3)
-    
-#     # 3) Compute the 3rd orthonormal vector by cross product
-#     v3_norm = torch.cross(v1_norm, v2_norm, dim=1)  # (B,3)
-    
-#     # 4) Stack columns to get rotation matrices (B,3,3)
-#     #    Each slice is a valid rotation matrix if v1, v2 were not degenerate
-#     rot_mats = torch.stack([v1_norm, v2_norm, v3_norm], dim=2)  # (B,3,3)
-#     return rot_mats
-
-def r6d_to_rotation_matrix(r6d: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
+def r6d_to_rotation_matrix(r6d: torch.Tensor) -> np.ndarray:
     assert r6d.shape[1] == 6, "r6d must have shape (B,6)."
+
+    # filter out nan values by setting them to 
     v1 = r6d[:, 0:3]  # (B,3)
     v2 = r6d[:, 3:6]  # (B,3)
     
-    # 1) Normalize v1 safely
-    v1_norm = v1 / (v1.norm(dim=1, keepdim=True) + eps)
+    # 1) Normalize v1
+    v1_norm = torch.nn.functional.normalize(v1, dim=1)  # (B,3)
     
     # 2) Make v2 orthogonal to v1
     dot = torch.sum(v2 * v1_norm, dim=1, keepdim=True)  # (B,1)
     proj = dot * v1_norm                                # (B,3)
     v2_ortho = v2 - proj                                # (B,3)
+    v2_norm = torch.nn.functional.normalize(v2_ortho, dim=1)  # (B,3)
     
-    # 3) Normalize v2_ortho safely
-    v2_norm = v2_ortho / (v2_ortho.norm(dim=1, keepdim=True) + eps)
+    # 3) Compute the 3rd orthonormal vector by cross product
+    v3_norm = torch.cross(v1_norm, v2_norm, dim=1)  # (B,3)
     
-    # 4) Compute the 3rd orthonormal vector by cross product
-    v3 = torch.cross(v1_norm, v2_norm, dim=1)
-    # (Optional) normalize v3 as well
-    v3_norm = v3 / (v3.norm(dim=1, keepdim=True) + eps)
-    
-    # 5) Stack columns to get rotation matrices (B,3,3)
+    # 4) Stack columns to get rotation matrices (B,3,3)
+    #    Each slice is a valid rotation matrix if v1, v2 were not degenerate
     rot_mats = torch.stack([v1_norm, v2_norm, v3_norm], dim=2)  # (B,3,3)
-    
-    # 6) Fix any that turned out left-handed by setting to identity matrix
-    dets = torch.det(rot_mats)
-    mask = dets < 0
-    if mask.any():
-        print(f'Warning: {mask.sum()} matrices were left-handed and set to identity.')
-        rot_mats[mask, :, :] = torch.eye(3, device=rot_mats.device)
-    
+
+    # filter out determinants that are 0
+    det = torch.det(rot_mats)
+    print(f'det 0 arrays: {torch.sum(det < 1e-6)} out of {det.shape[0]} total frames')
+    rot_mats[det < 1e-6] = torch.eye(3, device=rot_mats.device) # (B,3,3)
     return rot_mats
+
 
 
 def rotation_matrix_to_r6d(rot_mats: torch.Tensor) -> np.ndarray:
