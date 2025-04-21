@@ -76,7 +76,7 @@ if __name__ == "__main__":
     if config.device.type == 'cuda':
         accelerator = "gpu"
         print('using gpu')
-        devices = [0]
+        devices = [6]
     else:
         accelerator = "cpu"
         print('using cpu')

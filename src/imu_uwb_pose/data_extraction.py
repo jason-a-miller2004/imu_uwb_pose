@@ -79,8 +79,8 @@ def extract_amass(cdata, config):
     print(f'UWB distances shape: {uwb_distances.shape}')
     angles = extract_angle_amass(pose, config)
     print(f'Angles shape: {angles.shape}')
-    floor_distances = extract_dist_floor_amass(output, config)
-    print(f'Floor distances shape: {floor_distances.shape}')
+    # floor_distances = extract_dist_floor_amass(output, config)
+    # print(f'Floor distances shape: {floor_distances.shape}')
 
     # convert angles from axis-angle to r6d
     num_angles = angles.shape[1]
@@ -94,7 +94,7 @@ def extract_amass(cdata, config):
     angles_reshaped = angles.reshape(angles.shape[0], -1)
 
     # concat so that the shape is (frames, (angle1, angle2, ..., uwb dist 1, uwb dist 2, ..., uwb1 to floor1, uwb2 to floor2))
-    combined_features = torch.cat([angles_reshaped, uwb_distances, floor_distances], dim=1)
+    combined_features = torch.cat([angles_reshaped, uwb_distances], dim=1)
     print(f'Combined features shape: {combined_features.shape}')
 
     # convert global orient and body pose to r6d
@@ -121,7 +121,7 @@ def extract_angle_amass(pose, config, all=False):
     """
     Extract the angles from the AMASS dataset
     """
-    axis_angle_pose = pose[:,0:66].reshape(-1, 3)
+    axis_angle_pose = pose[:,0:66].reshape(-1, 3).cpu().numpy()
     
     # only keep body components
     rotation = R.from_rotvec(axis_angle_pose)

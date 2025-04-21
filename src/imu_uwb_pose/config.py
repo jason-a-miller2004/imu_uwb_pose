@@ -5,7 +5,7 @@ import datetime
 
 class config:
     def __init__(self, experiment=None, dataset=None):
-        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device('cuda:6' if torch.cuda.is_available() else 'cpu')
         self.root_dir = Path().absolute()
         self.dataset = dataset
         self.experiment = experiment

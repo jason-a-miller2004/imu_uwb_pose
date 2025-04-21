@@ -132,7 +132,6 @@ def r6d_to_rotation_matrix(r6d: torch.Tensor) -> np.ndarray:
 
     # filter out determinants that are 0
     det = torch.det(rot_mats)
-    print(f'det 0 arrays: {torch.sum(det < 1e-6)} out of {det.shape[0]} total frames')
     rot_mats[det < 1e-6] = torch.eye(3, device=rot_mats.device) # (B,3,3)
     return rot_mats
 

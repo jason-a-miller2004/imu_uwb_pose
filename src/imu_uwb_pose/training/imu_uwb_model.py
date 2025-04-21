@@ -16,7 +16,7 @@ class imu_uwb_pose_model(pl.LightningModule):
     """
     def __init__(self, config:config):
         super().__init__()
-        n_input = 6 * len(config.absolute_joint_angles) + len(config.uwb_dists) + len(config.uwb_floor_dists)
+        n_input = 6 * len(config.absolute_joint_angles) + len(config.uwb_dists) # add back dist above ground here
 
         n_output_joints = 22 # change back to 23 to add back translation
         self.n_output_joints = n_output_joints
@@ -49,8 +49,8 @@ class imu_uwb_pose_model(pl.LightningModule):
     def step(self, batch):
         inputs, target_pose, target_joints, input_lengths, _ = batch
         
-        pred = self(inputs, input_lengths)
-        
+        pred = self(inputs, input_lengths).reshape(-1, self.config.max_sample_length, self.n_output_joints, 6)
+
         target = target_pose
         
         loss = self.loss(pred, target_pose)
@@ -64,9 +64,9 @@ class imu_uwb_pose_model(pl.LightningModule):
             return torch.tensor(0.0, device=self.config.device)
 
         # convert back to axis-angle format
-        pred_pose = pred_pose.reshape(batch_size * self.n_output_joints, 6)
-        pred_pose = r6d_to_axis_angle(pred_pose)
-        pred_pose = pred_pose.reshape(batch_size, self.n_output_joints * 3)
+        pred_pose = pred_pose.reshape(batch_size * self.config.max_sample_length * self.n_output_joints, 6)
+        pred_pose = torch.tensor(r6d_to_axis_angle(pred_pose), dtype=torch.float32).to(self.config.device)
+        pred_pose = pred_pose.reshape(batch_size * self.config.max_sample_length, self.n_output_joints * 3)
 
         smpl_input = default_smpl_input(pred_pose.shape[0], self.config)
         smpl_input['global_orient'] = pred_pose[:, :3]
