@@ -192,7 +192,7 @@ def get_smpl_output(model, pose, config):
     vertices = []
     faces = model.faces
     for i in range(len(poses_array)):
-        cur_pose = torch.tensor(poses_array[i]).to(config.device)
+        cur_pose = poses_array[i].to(config.device)
         smpl_params = default_smpl_input(cur_pose.shape[0], config)
         smpl_params['global_orient'] = cur_pose[:, :3]
         smpl_params['body_pose'] = cur_pose[:, 3:66]

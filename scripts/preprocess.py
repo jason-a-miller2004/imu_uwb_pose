@@ -85,6 +85,7 @@ def process_footPoser():
                 continue
             if not (output['x'].shape[0] == output['y'].shape[0] == output['joints'].shape[0]):
                 print("x and y shapes do not match")
+                print(f"x shape: {output['x'].shape}, y shape: {output['y'].shape}, joints shape: {output['joints'].shape}")
                 continue
 
             # save the data
