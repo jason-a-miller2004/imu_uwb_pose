@@ -5,6 +5,66 @@ from imu_uwb_pose import utils
 import smplx
 from matplotlib import pyplot as plt
 import time
+from imu_uwb_pose import config as c, utils as u
+import os
+import pickle
+
+def extract_footposer(action_path, config):
+    files = os.listdir(action_path)
+
+    # extract the align.csv
+    align_file = [f for f in files if f.endswith("align.csv")][0]
+    align_path = os.path.join(action_path, align_file)
+    data = np.loadtxt(align_path, delimiter=',')
+    start, finish = int(data[0]), int(data[1])
+
+    # extract the sensor data and format it
+    sensor_file = [f for f in files if f.endswith("sensor.pkl")][0]
+    sensor_path = os.path.join(action_path, sensor_file)
+    with open(sensor_path, 'rb') as file:
+        sensor_data = pickle.load(file)
+
+    # combine in order left_imu, right_imu, uwb_dists
+    left_imu = u.rotation_matrix_to_r6d(torch.tensor(sensor_data['left_imu']))
+    right_imu = u.rotation_matrix_to_r6d(torch.tensor(sensor_data['right_imu']))
+    uwb_dists = sensor_data['uwb']
+
+    # concat all the fields into left imu, right imu, uwb dists
+    sensor_data = np.concatenate([left_imu, right_imu, uwb_dists], axis=1)
+    # convert to torch tensor
+    sensor_data = torch.tensor(sensor_data, dtype=torch.float32)[start:finish, :]
+
+    # load the mocap data
+    mocap_file = [f for f in files if f.endswith("stageii.pkl")][0]
+    mocap_path = os.path.join(action_path, mocap_file)
+
+    # instantiate smpl model
+    smpl = smplx.create(config.body_model, model_type='smplx',
+        gender='neutral', use_face_contour=False,
+        batch_size=1,
+        ext='npz',
+        age='adult').to(config.device)
+            
+
+    cdata = np.load(mocap_path, allow_pickle=True)
+    pose = cdata['fullpose'].astype(np.float32)
+
+    # currently at 120hz resample to 30hz
+    pose = torch.tensor(pose[::4, :66])
+
+    print(f'pose shape {pose.shape}')
+    vertices,joints,faces = u.get_smpl_output(smpl, pose, config)
+            
+    # get the pose in r6d
+    pose = pose.reshape(-1, 3)
+    r6d_pose = u.axis_angle_to_r6d(pose)
+    r6d_pose = r6d_pose.reshape(-1, 22 * 6)
+
+    return {
+        'x': sensor_data.detach().cpu().type(torch.float32),
+        'y': r6d_pose.detach().cpu().type(torch.float32),
+        'joints': joints.detach().cpu().type(torch.float32)[:, 0:22, :],
+    }
 
 def extract_amass(cdata, config):
     """
@@ -50,24 +110,14 @@ def extract_amass(cdata, config):
     # (If needed, you can also send the tensor to the appropriate device.)
     pose[:, :3] = aligned_rotvec
 
-    body_parms = {
-        'global_orient': torch.Tensor(pose[:, :3]).to(config.device), # controls the global root orientation
-        'body_pose': torch.Tensor(pose[:, 3:66]).to(config.device), # controls the body
-        # 'transl': torch.Tensor(tran).to(config.device), # controls the global body position # uncomment to add back in translation
-    }
-
-    smpl_params = utils.default_smpl_input(pose.shape[0], config)
-
-    for key in body_parms.keys():
-        smpl_params[key] = body_parms[key]
-
+    # instantiate the SMPL model
     smpl = smplx.create(config.body_model, model_type='smplx',
-                         gender='neutral', use_face_contour=False,
-                         batch_size=1,
-                         ext='npz',
-                         age='adult').to(config.device)
+                            gender='neutral', use_face_contour=False,
+                            batch_size=1,
+                            ext='npz',
+                            age='adult').to(config.device)
     
-    output = smpl(**{k: v for k, v in smpl_params.items()})
+    vertices, joints, faces = utils.get_smpl_output(smpl, pose, config)
     
     # visualize output
     # uncomment if you want to see visualization of movement
@@ -75,11 +125,11 @@ def extract_amass(cdata, config):
     # faces = smpl.faces
     # visualize_smplx_mesh(vertices, faces)
 
-    uwb_distances = extract_uwb_amass(output, config)
+    uwb_distances = extract_uwb_amass(joints, config)
     print(f'UWB distances shape: {uwb_distances.shape}')
     angles = extract_angle_amass(pose, config)
     print(f'Angles shape: {angles.shape}')
-    # floor_distances = extract_dist_floor_amass(output, config)
+    # floor_distances = extract_dist_floor_amass(joints, config)
     # print(f'Floor distances shape: {floor_distances.shape}')
 
     # convert angles from axis-angle to r6d
@@ -98,21 +148,21 @@ def extract_amass(cdata, config):
     print(f'Combined features shape: {combined_features.shape}')
 
     # convert global orient and body pose to r6d
-    global_r6d = utils.axis_angle_to_r6d(body_parms['global_orient']).reshape(-1, 1, 6)
+    global_r6d = utils.axis_angle_to_r6d(pose[:,:3]).reshape(-1, 1, 6)
 
-    body_pose = body_parms['body_pose'].reshape(-1, 3)
+    body_pose = pose[:,3:66].reshape(-1, 3)
     body_r6d = utils.axis_angle_to_r6d(body_pose)
     body_r6d = body_r6d.reshape(-1, 21, 6)
 
     params = torch.cat([global_r6d, body_r6d], dim=1)
 
     print(f'Params shape: {params.shape}')
-    print(f'Joints shape: {output.joints.shape}')
+    print(f'Joints shape: {joints.shape}')
     print()
     return {
         'x': combined_features.detach().cpu().type(torch.float32),
         'y': params.detach().cpu().type(torch.float32),
-        'joints': output.joints.detach().cpu().type(torch.float32)[:, 0:22, :],
+        'joints': joints.detach().cpu().type(torch.float32)[:, 0:22, :],
     }
 
 
@@ -170,11 +220,10 @@ def extract_angle_amass(pose, config, all=False):
 
     return selected_rotations
 
-def extract_uwb_amass(output, config):
+def extract_uwb_amass(joints, config):
     """
     Extract the UWB data from the AMASS dataset
     """
-    joints = output.joints  # Shape: (frames, 127, 3)
 
     p1_indices = torch.tensor([p1 for p1, p2 in config.uwb_dists], device=joints.device)
     p2_indices = torch.tensor([p2 for p1, p2 in config.uwb_dists], device=joints.device)
@@ -191,11 +240,10 @@ def extract_uwb_amass(output, config):
 
     return uwb_distances  # Torch tensor of shape (frames, len(uwb_dists))
 
-def extract_dist_floor_amass(output, config):
+def extract_dist_floor_amass(joints, config):
     """
     Extract the distance from the floor data from the AMASS dataset
     """
-    joints = output.joints  # Shape: (frames, 127, 3)
 
     # Get the root joint position
     root_position = joints[:, config.uwb_floor_dists, :]  # Shape: (frames, 3)

@@ -1,10 +1,11 @@
-from imu_uwb_pose import config as c, data_extraction as de
+from imu_uwb_pose import config as c, data_extraction as de, utils as u
 import numpy as np
 import os
-
+import pickle
 import os
 import numpy as np
 import torch
+import smplx
 
 def process_amass():
     config = c.config()
@@ -66,12 +67,33 @@ def process_amass():
                 save_path = os.path.join(save_dir, action.split(".")[0] + ".pt")
                 torch.save(output, save_path)
 
+def process_footPoser():
+    config = c.config()
 
+    processed_dir = os.path.join(config.processed_pose, "FootPoser")
 
+    for subject in os.listdir(config.raw_footposer):
+        for action in os.listdir(os.path.join(config.raw_footposer, subject)):
+            action_path = os.path.join(config.raw_footposer, subject, action)
 
-    
-    
-    
+            # Load the data
+            print(f'processing {action}')
+            output = de.extract_footposer(action_path, config)
+
+            if output is None:
+                print("output is none")
+                continue
+            if not (output['x'].shape[0] == output['y'].shape[0] == output['joints'].shape[0]):
+                print("x and y shapes do not match")
+                continue
+
+            # save the data
+            save_dir = os.path.join(processed_dir, subject)
+            os.makedirs(save_dir, exist_ok=True)
+            save_path = os.path.join(save_dir, action.split(".")[0] + ".pt")
+            print("save path: " + save_path)
+            torch.save(output, save_path)
+
 
 if __name__=="__main__":
-    process_amass()
+    process_footPoser()

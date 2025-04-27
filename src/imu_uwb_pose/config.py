@@ -10,7 +10,6 @@ class config:
         self.dataset = dataset
         self.experiment = experiment
         if self.experiment != None:
-            datestring = datetime.datetime.now().strftime("%m%d%Y-%H%M%S")
             self.checkpoint_path = self.root_dir / f"pose_models/checkpoints/{self.experiment}"
             self.checkpoint_path.mkdir(exist_ok=True, parents=True)
         
@@ -18,8 +17,9 @@ class config:
     amass_datasets = ['ACCAD', 'BMLhandball', 'BMLmovi', 'CMU',
                   'DanceDB', 'DFaust', 'EKUT', 'EyesJapanDataset', 'GRAB', 'HDM05', 'HUMAN4D', 'HumanEva', 'KIT', 'MoSh', 'PosePrior', 'SFU', 'SOMA', 'SSM', 'TCDHands', 'TotalCapture', 'Transitions']
     
-    raw_amass = '../../data/raw/amass'
-    processed_pose = '../../data/processed'
+    raw_amass = './data/raw/amass'
+    raw_footposer = './data/raw/FootPoser'
+    processed_pose = './data/processed'
     body_model = './body_models'
     absolute_joint_angles = [7, 8] # left and right joint angles
     uwb_dists = [(7,8)]
