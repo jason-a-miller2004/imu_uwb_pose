@@ -30,6 +30,10 @@ def get_dataset(config):
         from imu_uwb_pose.training import amass_dataset as dataset
         train_dataset = dataset.amass_dataset(config)
         test_dataset = dataset.amass_dataset(config, train=False)
+    elif dataset == "footposer_dataset":
+        from imu_uwb_pose.training import footposer_dataset as dataset
+        train_dataset = dataset.footposer_dataset(config)
+        test_dataset = dataset.footposer_dataset(config, train=False)
     else:
         print("Enter a valid model")
         return
@@ -39,7 +43,6 @@ def get_dataset(config):
 
     # split the dataset
     train_dataset, val_dataset = torch.utils.data.random_split(train_dataset, [train_size, val_size])
-
     return train_dataset, test_dataset, val_dataset
 
 class imu_uwb_data_module(pl.LightningDataModule):
