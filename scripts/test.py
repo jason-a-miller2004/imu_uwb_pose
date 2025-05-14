@@ -31,16 +31,18 @@ if __name__ == "__main__":
     # -------------------------------------------------------------------------
     # 2) Initialize config with the provided experiment name
     # -------------------------------------------------------------------------
-    config = c.config(
-        experiment=args.experiment,
-        dataset="amass_dataset"
-    )
 
     # Optional: if --finetune is set, do something special here
     if args.finetune:
-        print("Fine-tuning mode is ON (for testing).")
-        # For example, you could point to a different checkpoint or handle
-        # specialized logic for your test run.
+        config = c.config(
+            experiment=args.experiment + "-finetune",
+            dataset="footposer_dataset"
+        )
+    else:
+        config = c.config(
+            experiment=args.experiment,
+            dataset="amass_dataset"
+        )
 
     # -------------------------------------------------------------------------
     # 3) Read the best model path from best_model.txt
@@ -85,12 +87,12 @@ if __name__ == "__main__":
         fast_dev_run=False,
     )
 
-print("Running model predictions on the test set...")
-outputs = trainer.predict(model, datamodule=datamodule)
+    print("Running model predictions on the test set...")
+    outputs = trainer.predict(model, datamodule=datamodule)
 
-torch.save(outputs, "outputs.pt")
+    torch.save(outputs, "outputs.pt")
 
-print("Predictions saved to 'outputs.pt'.")
-print("Test run complete.")
+    print("Predictions saved to 'outputs.pt'.")
+    print("Test run complete.")
 
 

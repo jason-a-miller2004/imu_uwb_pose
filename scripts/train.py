@@ -13,6 +13,7 @@ import argparse
 from imu_uwb_pose import config as c
 from imu_uwb_pose.training import imu_uwb_model as model
 from imu_uwb_pose.training.utils import imu_uwb_data_module as imu_uwb_data_module
+from pathlib import Path
 
 if __name__ == "__main__":
     # -------------------------------------------------------------------------
@@ -35,25 +36,50 @@ if __name__ == "__main__":
     # -------------------------------------------------------------------------
     # 2) Use experiment argument in config
     # -------------------------------------------------------------------------
-    config = c.config(
-        experiment=args.experiment,
-        dataset="amass_dataset"  # or read from another cmd arg if you prefer
-    )
     
     # Optionally, do something special if --finetune was set:
     if args.finetune:
-        print("Fine-tuning mode is ON.")
+        config = c.config(
+            experiment=args.experiment,
+            dataset="footposer_dataset"  # or read from another cmd arg if you prefer
+        )
+
+        # load the checkpoint path
+        checkpoint_path = config.checkpoint_path
+        # read first line of best model.txt
+        with open(checkpoint_path / "best_model.txt", "r") as f:
+            lines = f.readlines()
+            checkpoint_path = lines[0].strip()
+
+        # load the model
+        model = model.imu_uwb_pose_model.load_from_checkpoint(
+            checkpoint_path,
+            config=config,
+            map_location=config.device
+        )
+
+        experiment = config.experiment + '-finetune'
+        checkpoint_path = Path(str(config.checkpoint_path) + '-finetune')
+
+    else:
+        config = c.config(
+            experiment=args.experiment,
+            dataset="amass_dataset",  # or read from another cmd arg if you prefer
+        )
+        experiment = config.experiment
+        checkpoint_path = config.checkpoint_path
+
+
+        model = model.imu_uwb_pose_model(config)
 
     # set the random seed
     seed_everything(config.torch_seed, workers=True)
 
     # instantiate model and data
-    model = model.imu_uwb_pose_model(config)
     datamodule = imu_uwb_data_module(config)
-    checkpoint_path = config.checkpoint_path 
 
     # set up WandB logger
-    wandb_logger = WandbLogger(project=config.experiment, save_dir=checkpoint_path)
+    wandb_logger = WandbLogger(project=experiment, save_dir=checkpoint_path)
 
     early_stopping_callback = EarlyStopping(
         monitor="validation_step_loss",

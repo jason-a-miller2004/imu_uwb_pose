@@ -10,6 +10,8 @@ import argparse
 import matplotlib.pyplot as plt
 import pickle
 from scipy.spatial.transform import Rotation as R
+from matplotlib.animation import FuncAnimation
+
 
 # visualize an output file
 def visualize_model_output(file_loc, smpl, config):
@@ -43,7 +45,7 @@ def visualize_mocap_output(file_loc, smpl, config, framerate=30):
     pose = cdata['fullpose'].astype(np.float32)
 
     # currently at 120hz resample to 30hz
-    pose = torch.tensor(pose[::4, :])
+    pose = torch.tensor(pose) #pose = torch.tensor(pose[::4, :])
     
     vertices, joints, faces = utils.get_smpl_output(smpl, pose, config)
 
@@ -61,31 +63,77 @@ def align_output(sensor_loc, mocap_loc, config, overlay, offset):
         data = pickle.load(file)
 
     # plot uwb distances and imu angles
-    uwb_dists = data['uwb'][offset[0]:offset[1]]
-    smpl_dists = de.extract_uwb_amass(joints, config)
+    uwb_dists = data['uwb'][offset[2]:offset[3]]
+    smpl_dists = de.extract_uwb_amass(joints, config)[offset[0]:offset[1]]
+    print(f'pose shape: {smpl_dists.shape}')
 
     # make a subplot with two plots showing both dists with number of frames being the x-axis
     plot_and_compare(smpl_dists, uwb_dists, overlay, title='UWB Distances', smpl_ylabel='SMPL distance', sensor_ylabel='Sensor distance')
 
     # convert left and right imus to axis angle
-    left_imu_ori = data['left_imu']
-    right_imu_ori = data['right_imu']
-    left_imu_ori = R.from_matrix(left_imu_ori)
-    left_imu_ori = left_imu_ori.as_rotvec()[offset[0]:offset[1]]
+    left_imu_ori = data['left_imu'][offset[2]:offset[3]]
+    right_imu_ori = data['right_imu'][offset[2]:offset[3]]
+    left_imu_rot = R.from_matrix(left_imu_ori)
+    left_imu_vec = left_imu_rot.as_rotvec()
 
-    right_imu_ori = R.from_matrix(right_imu_ori)
-    right_imu_ori = right_imu_ori.as_rotvec()[offset[0]:offset[1]]
+    right_imu_rot = R.from_matrix(right_imu_ori)
+    right_imu_vec = right_imu_rot.as_rotvec()
 
     # get left and right from smpl
     joint_angles = de.extract_angle_amass(pose, config)
-    left_smpl_ori = joint_angles[:, 0, :]
-    right_smpl_ori = joint_angles[:, 1, :]
+    left_smpl_vec = joint_angles[:, 0, :][offset[0]:offset[1]]
+    right_smpl_vec = joint_angles[:, 1, :][offset[0]:offset[1]]
 
     # plot and compare left ankle
-    plot_and_compare(left_smpl_ori, left_imu_ori, overlay, 'Left Ankle Orientation', smpl_ylabel='SMPL Orientation', sensor_ylabel='Sensor Orientation', labels=(['sensor_x', 'sensor_y', 'sensor_z'], ['smpl_x', 'smpl_y', 'smpl_z']))
+    plot_and_compare(left_smpl_vec, left_imu_vec, overlay, 'Left Ankle Orientation', smpl_ylabel='SMPL Orientation', sensor_ylabel='Sensor Orientation', labels=(['sensor_x', 'sensor_y', 'sensor_z'], ['smpl_x', 'smpl_y', 'smpl_z']))
 
     # plot and compare right ankle
-    plot_and_compare(right_smpl_ori, right_imu_ori, overlay, 'Right ankle Orientation', smpl_ylabel='SMPL Orientation', sensor_ylabel='Sensor Orientation', labels=(['sensor_x', 'sensor_y', 'sensor_z'], ['smpl_x', 'smpl_y', 'smpl_z']))
+    plot_and_compare(right_smpl_vec, right_imu_vec, overlay, 'Right ankle Orientation', smpl_ylabel='SMPL Orientation', sensor_ylabel='Sensor Orientation', labels=(['sensor_x', 'sensor_y', 'sensor_z'], ['smpl_x', 'smpl_y', 'smpl_z']))
+
+    # now compare in visualizer
+    # convert left and right smpl to rotation matrices
+    left_smpl_ori = R.from_rotvec(np.array(left_smpl_vec)).as_matrix()
+    right_smpl_ori = R.from_rotvec(np.array(right_smpl_vec)).as_matrix()
+
+    print(f'left smpl shape: {left_smpl_ori.shape}')
+    print(f'left imu shape: {left_imu_ori.shape}')
+    animate_rotations(left_smpl_ori, left_imu_ori, fps=30, axis_len=0.2)
+    animate_rotations(right_smpl_ori, right_imu_ori, fps=30, axis_len=0.2)
+
+def animate_rotations(smpl_ori, imu_ori, fps=30, axis_len=0.25):
+    smpl_ori = np.asarray(smpl_ori)
+    imu_ori  = np.asarray(imu_ori)
+    assert smpl_ori.shape == imu_ori.shape and smpl_ori.shape[1:] == (3, 3)
+    n_frames = smpl_ori.shape[0]
+
+    fig = plt.figure(figsize=(10, 5))
+    ax_smpl = fig.add_subplot(1, 2, 1, projection='3d')
+    ax_imu  = fig.add_subplot(1, 2, 2, projection='3d')
+    for ax, title in [(ax_smpl, 'SMPL orientation'), (ax_imu, 'IMU orientation')]:
+        span = 1.2
+        for setter in (ax.set_xlim, ax.set_ylim, ax.set_zlim):
+            setter(-span, span)
+        ax.set_xlabel('X'); ax.set_ylabel('Y'); ax.set_zlabel('Z'); ax.set_title(title)
+
+    colours = ['r', 'g', 'b']
+    smpl_lines = [ax_smpl.plot([], [], [], c=c, lw=2)[0] for c in colours]
+    imu_lines  = [ax_imu .plot([], [], [], c=c, lw=2)[0] for c in colours]
+
+    frame_txt = fig.text(0.5, 0.95, '', ha='center', va='top', fontsize=12)
+
+    def update(idx):
+        for lines, R in ((smpl_lines, smpl_ori[idx]), (imu_lines, imu_ori[idx])):
+            for i in range(3):
+                end = R[:, i] * axis_len
+                lines[i].set_data([0, end[0]], [0, end[1]])
+                lines[i].set_3d_properties([0, end[2]])
+        frame_txt.set_text(f'Frame {idx + 1} / {n_frames}')
+        return smpl_lines + imu_lines + [frame_txt]
+
+    ani = FuncAnimation(fig, update, frames=n_frames,
+                        interval=1000./fps, blit=False)   # ← blit disabled
+    plt.tight_layout()
+    plt.show()
 
 def plot_and_compare(smpl_output, sensor_output, overlay, title, smpl_ylabel, sensor_ylabel, labels=None):
     # plot the smpl output and sensor output
@@ -208,8 +256,8 @@ if __name__ == "__main__":
     # Required positional argument
     parser.add_argument('file_loc', type=str, help='location of file being visualized')
 
-    parser.add_argument("--offset", nargs=2, type=int, metavar=("start", "stop"),
-                        help="Provide exactly two integers")
+    parser.add_argument("--offset", nargs=4, type=int, metavar=("smpl start", "smpl stop", "sensor start", "sensor stop"),
+                        help="Provide exactly four integers")
 
     # offset to 
     args = parser.parse_args()

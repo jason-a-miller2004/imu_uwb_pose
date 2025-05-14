@@ -9,14 +9,14 @@ from imu_uwb_pose import config as c, utils as u
 import os
 import pickle
 
-def extract_footposer(action_path, config):
+def extract_footposer(action_path, config, skiprate=1):
     files = os.listdir(action_path)
 
     # extract the align.csv
     align_file = [f for f in files if f.endswith("align.csv")][0]
     align_path = os.path.join(action_path, align_file)
     data = np.loadtxt(align_path, delimiter=',')
-    start, finish = int(data[0]), int(data[1])
+    smpl_start, smpl_finish, sensor_start, sensor_finish = int(data[0]), int(data[1]), int(data[2]), int(data[3])
 
     # extract the sensor data and format it
     sensor_file = [f for f in files if f.endswith("sensor.pkl")][0]
@@ -32,7 +32,7 @@ def extract_footposer(action_path, config):
     # concat all the fields into left imu, right imu, uwb dists
     sensor_data = np.concatenate([left_imu, right_imu, uwb_dists], axis=1)
     # convert to torch tensor
-    sensor_data = torch.tensor(sensor_data, dtype=torch.float32)[start:finish, :]
+    sensor_data = torch.tensor(sensor_data, dtype=torch.float32)[sensor_start:sensor_finish, :]
 
     # load the mocap data
     mocap_file = [f for f in files if f.endswith("stageii.pkl")][0]
@@ -50,7 +50,8 @@ def extract_footposer(action_path, config):
     pose = cdata['fullpose'].astype(np.float32)
 
     # currently at 120hz resample to 30hz
-    pose = torch.tensor(pose[::4, :66])
+    pose = torch.tensor(pose[::skiprate, :66])
+    pose = pose[smpl_start:smpl_finish, :]
 
     print(f'pose shape {pose.shape}')
     vertices,joints,faces = u.get_smpl_output(smpl, pose, config)
@@ -58,7 +59,7 @@ def extract_footposer(action_path, config):
     # get the pose in r6d
     pose = pose.reshape(-1, 3)
     r6d_pose = u.axis_angle_to_r6d(pose)
-    r6d_pose = r6d_pose.reshape(-1, 22 * 6)
+    r6d_pose = r6d_pose.reshape(-1, 22, 6)
 
     return {
         'x': sensor_data.detach().cpu().type(torch.float32),

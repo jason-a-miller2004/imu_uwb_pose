@@ -28,7 +28,7 @@ class config:
 
     # done with 30 fps in mind. If fps is different, change this value
     max_sample_length = 150
-    batch_size = 128
+    batch_size = 8
 
     def get_smpl_skeleton(self):
         return torch.tensor([

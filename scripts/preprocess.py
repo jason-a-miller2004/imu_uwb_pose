@@ -73,12 +73,17 @@ def process_footPoser():
     processed_dir = os.path.join(config.processed_pose, "FootPoser")
 
     for subject in os.listdir(config.raw_footposer):
+        print(f'processing {subject}')
+        if subject == 'p1':
+            skiprate = 4
+        else:
+            skiprate = 1
         for action in os.listdir(os.path.join(config.raw_footposer, subject)):
             action_path = os.path.join(config.raw_footposer, subject, action)
 
             # Load the data
             print(f'processing {action}')
-            output = de.extract_footposer(action_path, config)
+            output = de.extract_footposer(action_path, config, skiprate=skiprate)
 
             if output is None:
                 print("output is none")
