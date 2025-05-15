@@ -56,7 +56,7 @@ def align_output(sensor_loc, mocap_loc, config, overlay, offset):
     pose = cdata['fullpose'].astype(np.float32)
 
     # currently at 120hz resample to 30hz
-    pose = torch.tensor(pose[::4, :])
+    pose = torch.tensor(pose)   #pose = torch.tensor(pose[::4, :])
     vertices, joints, faces = utils.get_smpl_output(smpl, pose, config)
 
     with open(sensor_loc, 'rb') as file:
