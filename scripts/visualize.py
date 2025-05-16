@@ -43,21 +43,25 @@ def visualize_model_output(file_loc, smpl, config):
 def visualize_mocap_output(file_loc, smpl, config, framerate=30):
     cdata = np.load(file_loc, allow_pickle=True)
     pose = cdata['fullpose'].astype(np.float32)
+    trans = cdata['trans'].astype(np.float32)
 
     # currently at 120hz resample to 30hz
     pose = torch.tensor(pose) #pose = torch.tensor(pose[::4, :])
+    trans = torch.tensor(trans)
     
-    vertices, joints, faces = utils.get_smpl_output(smpl, pose, config)
+    vertices, joints, faces = utils.get_smpl_output(smpl, pose, config, trans=trans)
 
     visualize_frames_open3d(vertices, faces, fps=framerate)
 
 def align_output(sensor_loc, mocap_loc, config, overlay, offset):
     cdata = np.load(mocap_loc, allow_pickle=True)
     pose = cdata['fullpose'].astype(np.float32)
+    trans = cdata['trans'].astype(np.float32)
 
     # currently at 120hz resample to 30hz
     pose = torch.tensor(pose)   #pose = torch.tensor(pose[::4, :])
-    vertices, joints, faces = utils.get_smpl_output(smpl, pose, config)
+    trans = torch.tensor(trans)
+    vertices, joints, faces = utils.get_smpl_output(smpl, pose, config, trans=trans)
 
     with open(sensor_loc, 'rb') as file:
         data = pickle.load(file)
@@ -70,6 +74,14 @@ def align_output(sensor_loc, mocap_loc, config, overlay, offset):
     # make a subplot with two plots showing both dists with number of frames being the x-axis
     plot_and_compare(smpl_dists, uwb_dists, overlay, title='UWB Distances', smpl_ylabel='SMPL distance', sensor_ylabel='Sensor distance')
 
+    smpl_floor_dists = de.extract_dist_floor_amass(joints, config)[offset[0]:offset[1], :]
+    left_smpl_floor = smpl_floor_dists[:, 0]
+    right_smpl_floor = smpl_floor_dists[:, 1]
+
+    left_sensor_floor = data['left_altitude'][offset[2]:offset[3]]
+    right_sensor_floor = data['right_altitude'][offset[2]:offset[3]]
+
+    plot_and_compare(left_smpl_floor, left_sensor_floor, overlay, title='Left Foot Above Ground', smpl_ylabel='SMPL Altitude', sensor_ylabel='Sensor Altitude')
     # convert left and right imus to axis angle
     left_imu_ori = data['left_imu'][offset[2]:offset[3]]
     right_imu_ori = data['right_imu'][offset[2]:offset[3]]

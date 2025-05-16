@@ -9,7 +9,7 @@ from imu_uwb_pose import config as c, utils as u
 import os
 import pickle
 
-def extract_footposer(action_path, config, skiprate=1):
+def extract_footposer(action_path, config, smpl, skiprate=1):
     files = os.listdir(action_path)
 
     # extract the align.csv
@@ -29,23 +29,17 @@ def extract_footposer(action_path, config, skiprate=1):
     left_imu = u.rotation_matrix_to_r6d(torch.tensor(sensor_data['left_imu']))
     right_imu = u.rotation_matrix_to_r6d(torch.tensor(sensor_data['right_imu']))
     uwb_dists = sensor_data['uwb']
+    left_altitude = sensor_data['left_altitude'][:, np.newaxis]
+    right_altitude = sensor_data['right_altitude'][:, np.newaxis]
 
     # concat all the fields into left imu, right imu, uwb dists
-    sensor_data = np.concatenate([left_imu, right_imu, uwb_dists], axis=1)
+    sensor_data = np.concatenate([left_imu, right_imu, uwb_dists, left_altitude, right_altitude], axis=1)
     # convert to torch tensor
     sensor_data = torch.tensor(sensor_data, dtype=torch.float32)[sensor_start:sensor_finish, :]
 
     # load the mocap data
     mocap_file = [f for f in files if f.endswith("stageii.pkl")][0]
     mocap_path = os.path.join(action_path, mocap_file)
-
-    # instantiate smpl model
-    smpl = smplx.create(config.body_model, model_type='smplx',
-        gender='neutral', use_face_contour=False,
-        batch_size=1,
-        ext='npz',
-        age='adult').to(config.device)
-            
 
     cdata = np.load(mocap_path, allow_pickle=True)
     pose = cdata['fullpose'].astype(np.float32)
@@ -68,16 +62,18 @@ def extract_footposer(action_path, config, skiprate=1):
         'joints': joints.detach().cpu().type(torch.float32)[:, 0:22, :],
     }
 
-def extract_amass(cdata, config):
+def extract_amass(cdata, smpl, config):
     """
     Extract the data from the AMASS dataset
     """
-
-    if 'mocap_framerate' not in cdata:
+    if 'mocap_framerate' in cdata:
+        framerate = int(cdata['mocap_framerate'])
+    elif 'mocap_frame_rate' in cdata:
+        framerate = int(cdata['mocap_frame_rate'])
+    else:
         print('does not contain mocap_framerate')
         return None
 
-    framerate = int(cdata['mocap_framerate'])
     print(f'framerate {framerate}')
     if framerate == 120: step = 4
     elif framerate == 60 or framerate == 59: step = 2
@@ -111,13 +107,8 @@ def extract_amass(cdata, config):
     # Update pose with the new aligned axis-angle rotations.
     # (If needed, you can also send the tensor to the appropriate device.)
     pose[:, :3] = aligned_rotvec
-
-    # instantiate the SMPL model
-    smpl = smplx.create(config.body_model, model_type='smplx',
-                            gender='neutral', use_face_contour=False,
-                            batch_size=1,
-                            ext='npz',
-                            age='adult').to(config.device)
+    pose = torch.tensor(pose, dtype=torch.float32)
+    tran = torch.tensor(tran, dtype=torch.float32)
     
     vertices, joints, faces = utils.get_smpl_output(smpl, pose, config)
     
@@ -131,7 +122,10 @@ def extract_amass(cdata, config):
     print(f'UWB distances shape: {uwb_distances.shape}')
     angles = extract_angle_amass(pose, config)
     print(f'Angles shape: {angles.shape}')
-    # floor_distances = extract_dist_floor_amass(joints, config)
+
+    # get smpl with translation to extract floor dists
+    _, trans_joints, _ = utils.get_smpl_output(smpl, pose, config, tran)
+    floor_distances = extract_dist_floor_amass(trans_joints, config)
     # print(f'Floor distances shape: {floor_distances.shape}')
 
     # convert angles from axis-angle to r6d
@@ -146,7 +140,7 @@ def extract_amass(cdata, config):
     angles_reshaped = angles.reshape(angles.shape[0], -1)
 
     # concat so that the shape is (frames, (angle1, angle2, ..., uwb dist 1, uwb dist 2, ..., uwb1 to floor1, uwb2 to floor2))
-    combined_features = torch.cat([angles_reshaped, uwb_distances], dim=1)
+    combined_features = torch.cat([angles_reshaped, uwb_distances, floor_distances], dim=1)
     print(f'Combined features shape: {combined_features.shape}')
 
     # convert global orient and body pose to r6d

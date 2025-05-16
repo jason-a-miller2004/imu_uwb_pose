@@ -179,7 +179,7 @@ def axis_angle_to_r6d(axis_angles: torch.Tensor) -> np.ndarray:
     r6d = rotation_matrix_to_r6d(torch.tensor(rot_mats, device=axis_angles.device))
     return r6d
 
-def get_smpl_output(model, pose, config):
+def get_smpl_output(model, pose, config, trans=None):
     '''
     Get the output of the SMPL model from the pose param of file
     appropiately batches input to smpl model so cpu/gpu memory is not exceeded
@@ -187,6 +187,9 @@ def get_smpl_output(model, pose, config):
 
     # batch the pose
     poses_array = torch.split(pose, config.batch_size * config.max_sample_length)
+
+    if trans is not None:
+        trans_array = torch.split(trans, config.batch_size * config.max_sample_length)
 
     joints = []
     vertices = []
@@ -196,6 +199,10 @@ def get_smpl_output(model, pose, config):
         smpl_params = default_smpl_input(cur_pose.shape[0], config)
         smpl_params['global_orient'] = cur_pose[:, :3]
         smpl_params['body_pose'] = cur_pose[:, 3:66]
+
+        if trans is not None:
+            cur_trans = trans_array[i].to(config.device)
+            smpl_params['transl'] = cur_trans
 
         # get the output
         output = model(**{k: v for k, v in smpl_params.items()})

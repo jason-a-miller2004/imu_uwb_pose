@@ -7,8 +7,8 @@ import numpy as np
 import torch
 import smplx
 
-def process_amass():
-    config = c.config()
+
+def process_amass(config, smpl):
     processed = []
 
     processed_dir = os.path.join(config.processed_pose, "AMASS", "train")
@@ -52,7 +52,7 @@ def process_amass():
                     continue
 
                 # Process the data
-                output = de.extract_amass(data, config)
+                output = de.extract_amass(data, smpl, config)
 
                 if output is None:
                     print("output is none")
@@ -67,9 +67,7 @@ def process_amass():
                 save_path = os.path.join(save_dir, action.split(".")[0] + ".pt")
                 torch.save(output, save_path)
 
-def process_footPoser():
-    config = c.config()
-
+def process_footPoser(config, smpl):
     processed_dir = os.path.join(config.processed_pose, "FootPoser")
 
     for subject in os.listdir(config.raw_footposer):
@@ -86,7 +84,7 @@ def process_footPoser():
 
             # Load the data
             print(f'processing {action}')
-            output = de.extract_footposer(action_path, config, skiprate=skiprate)
+            output = de.extract_footposer(action_path, config, smpl, skiprate=skiprate)
 
             if output is None:
                 print("output is none")
@@ -105,4 +103,13 @@ def process_footPoser():
 
 
 if __name__=="__main__":
-    process_footPoser()
+    config = c.config()
+
+    # instantiate the SMPL model
+    smpl = smplx.create(config.body_model, model_type='smplx',
+                            gender='neutral', use_face_contour=False,
+                            batch_size=1,
+                            ext='npz',
+                            age='adult').to(config.device)
+    # process_amass(config, smpl)
+    process_footPoser(config, smpl)
