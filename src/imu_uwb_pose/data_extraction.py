@@ -15,11 +15,12 @@ def extract_footposer(action_path, config, skiprate=1):
     # extract the align.csv
     align_file = [f for f in files if f.endswith("align.csv")][0]
     align_path = os.path.join(action_path, align_file)
+    print("align path", align_path)
     data = np.loadtxt(align_path, delimiter=',')
     smpl_start, smpl_finish, sensor_start, sensor_finish = int(data[0]), int(data[1]), int(data[2]), int(data[3])
 
     # extract the sensor data and format it
-    sensor_file = [f for f in files if f.endswith("sensor.pkl")][0]
+    sensor_file = [f for f in files if f.endswith("orientation.pkl")][0]
     sensor_path = os.path.join(action_path, sensor_file)
     with open(sensor_path, 'rb') as file:
         sensor_data = pickle.load(file)

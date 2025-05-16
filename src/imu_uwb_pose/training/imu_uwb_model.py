@@ -37,7 +37,7 @@ class imu_uwb_pose_model(pl.LightningModule):
                          age='adult').to(config.device)
 
         self.loss = nn.MSELoss()
-        self.lr = 3e-4
+        self.lr = 1e-3
         self.save_hyperparameters()
         
         self.validation_step_outputs = []  # Store validation outputs manually

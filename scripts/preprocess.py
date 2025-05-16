@@ -74,12 +74,15 @@ def process_footPoser():
 
     for subject in os.listdir(config.raw_footposer):
         print(f'processing {subject}')
-        if subject == 'p1':
-            skiprate = 4
-        else:
-            skiprate = 1
+
         for action in os.listdir(os.path.join(config.raw_footposer, subject)):
             action_path = os.path.join(config.raw_footposer, subject, action)
+
+            if subject == 'richard' and action.endswith("1"):
+                print(f'action path {action_path} has 120hz')
+                skiprate = 4
+            else:
+                skiprate = 1
 
             # Load the data
             print(f'processing {action}')
