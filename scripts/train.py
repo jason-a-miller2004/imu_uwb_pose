@@ -31,6 +31,13 @@ if __name__ == "__main__":
         action="store_true",
         help="If set, the script will run in fine-tuning mode (optional)."
     )
+
+    parser.add_argument(
+        "--lr",
+        type=float,
+        default=1e-3,
+        help="Learning rate for the optimizer."
+    )
     args = parser.parse_args()
 
     # -------------------------------------------------------------------------
@@ -41,7 +48,8 @@ if __name__ == "__main__":
     if args.finetune:
         config = c.config(
             experiment=args.experiment,
-            dataset="footposer_dataset"  # or read from another cmd arg if you prefer
+            dataset="footposer_dataset",
+            lr=args.lr
         )
 
         # load the checkpoint path
@@ -64,7 +72,8 @@ if __name__ == "__main__":
     else:
         config = c.config(
             experiment=args.experiment,
-            dataset="amass_dataset",  # or read from another cmd arg if you prefer
+            dataset="amass_dataset",
+            lr=args.lr
         )
         experiment = config.experiment
         checkpoint_path = config.checkpoint_path
@@ -102,7 +111,7 @@ if __name__ == "__main__":
     if config.device.type == 'cuda':
         accelerator = "gpu"
         print('using gpu')
-        devices = [6]
+        devices = [0]
     else:
         accelerator = "cpu"
         print('using cpu')
@@ -111,7 +120,7 @@ if __name__ == "__main__":
     trainer = pl.Trainer(
         fast_dev_run=False,
         logger=wandb_logger,
-        max_epochs=1000,
+        max_epochs=5,
         accelerator=accelerator,
         devices=devices,
         callbacks=[early_stopping_callback, checkpoint_callback],

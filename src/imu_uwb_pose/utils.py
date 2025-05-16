@@ -179,38 +179,43 @@ def axis_angle_to_r6d(axis_angles: torch.Tensor) -> np.ndarray:
     r6d = rotation_matrix_to_r6d(torch.tensor(rot_mats, device=axis_angles.device))
     return r6d
 
+@torch.no_grad()                # 1. turn off autograd
 def get_smpl_output(model, pose, config, trans=None):
-    '''
-    Get the output of the SMPL model from the pose param of file
-    appropiately batches input to smpl model so cpu/gpu memory is not exceeded
-    '''
+    """
+    Run SMPL in small chunks so GPU VRAM never spikes.
+    Returns CPU tensors: vertices  [N, 6890, 3],
+                          joints   [N, 144, 3] (SMPL-X) or [N, 24, 3] (SMPL)
+    """
+    model.eval()                # 2. inference mode
 
-    # batch the pose
-    poses_array = torch.split(pose, config.batch_size * config.max_sample_length)
+    # If you want FP16, uncomment the next two lines:
+    # model.half()              # 4a. halve model weights
+    # pose = pose.to(torch.float16)
 
-    if trans is not None:
-        trans_array = torch.split(trans, config.batch_size * config.max_sample_length)
+    chunk = config.batch_size   # 5. single mini-batch at a time
+    verts_list, joints_list = [], []
 
-    joints = []
-    vertices = []
-    faces = model.faces
-    for i in range(len(poses_array)):
-        cur_pose = poses_array[i].to(config.device)
+    for start in range(0, pose.shape[0], chunk):
+        end = start + chunk
+        cur_pose = pose[start:end].to(config.device, non_blocking=True)
+
         smpl_params = default_smpl_input(cur_pose.shape[0], config)
         smpl_params['global_orient'] = cur_pose[:, :3]
-        smpl_params['body_pose'] = cur_pose[:, 3:66]
+        smpl_params['body_pose']     = cur_pose[:, 3:66]
 
         if trans is not None:
-            cur_trans = trans_array[i].to(config.device)
+            cur_trans = trans[start:end].to(config.device, non_blocking=True)
             smpl_params['transl'] = cur_trans
 
-        # get the output
-        output = model(**{k: v for k, v in smpl_params.items()})
-        vertices.append(output.vertices)
-        joints.append(output.joints)
+        output = model(**smpl_params)
 
-    # concat all the samples
-    vertices = torch.cat(vertices, dim=0)
-    joints = torch.cat(joints, dim=0)
+        # 3. copy results to CPU immediately, then free GPU tensors
+        verts_list.append(output.vertices.cpu())
+        joints_list.append(output.joints.cpu())
 
-    return vertices, joints, faces
+        del output, cur_pose, smpl_params
+        torch.cuda.empty_cache()    # releases cached blocks
+
+    vertices = torch.cat(verts_list, dim=0)
+    joints   = torch.cat(joints_list, dim=0)
+    return vertices, joints, model.faces

@@ -44,7 +44,7 @@ def process_amass(config, smpl):
                 action_path = os.path.join(subject_path, action)
 
                 # Load the data
-                print(f'processing {action}')
+                print(f'processing {action_path}')
                 try:
                     data = np.load(action_path)
                 except:
@@ -71,7 +71,6 @@ def process_footPoser(config, smpl):
     processed_dir = os.path.join(config.processed_pose, "FootPoser")
 
     for subject in os.listdir(config.raw_footposer):
-        print(f'processing {subject}')
 
         for action in os.listdir(os.path.join(config.raw_footposer, subject)):
             action_path = os.path.join(config.raw_footposer, subject, action)
@@ -83,7 +82,7 @@ def process_footPoser(config, smpl):
                 skiprate = 1
 
             # Load the data
-            print(f'processing {action}')
+            print(f'processing {action_path}')
             output = de.extract_footposer(action_path, config, smpl, skiprate=skiprate)
 
             if output is None:
@@ -105,11 +104,12 @@ def process_footPoser(config, smpl):
 if __name__=="__main__":
     config = c.config()
 
+    print("using device: ", config.device)
     # instantiate the SMPL model
     smpl = smplx.create(config.body_model, model_type='smplx',
                             gender='neutral', use_face_contour=False,
                             batch_size=1,
                             ext='npz',
                             age='adult').to(config.device)
-    # process_amass(config, smpl)
+    process_amass(config, smpl)
     process_footPoser(config, smpl)

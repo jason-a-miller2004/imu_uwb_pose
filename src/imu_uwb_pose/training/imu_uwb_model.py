@@ -16,7 +16,7 @@ class imu_uwb_pose_model(pl.LightningModule):
     """
     def __init__(self, config:config):
         super().__init__()
-        n_input = 6 * len(config.absolute_joint_angles) + len(config.uwb_dists) # add back dist above ground here
+        n_input = 6 * len(config.absolute_joint_angles) + len(config.uwb_dists) + len(config.uwb_floor_dists) # add back dist above ground here
 
         n_output_joints = 22 # change back to 23 to add back translation
         self.n_output_joints = n_output_joints
@@ -37,7 +37,7 @@ class imu_uwb_pose_model(pl.LightningModule):
                          age='adult').to(config.device)
 
         self.loss = nn.MSELoss()
-        self.lr = 1e-3
+        self.lr = config.lr
         self.save_hyperparameters()
         
         self.validation_step_outputs = []  # Store validation outputs manually
@@ -48,9 +48,7 @@ class imu_uwb_pose_model(pl.LightningModule):
 
     def step(self, batch):
         inputs, target_pose, target_joints, input_lengths, _ = batch
-        
         pred = self(inputs, input_lengths).reshape(-1, self.config.max_sample_length, self.n_output_joints, 6)
-
         target = target_pose
         
         loss = self.loss(pred, target_pose)

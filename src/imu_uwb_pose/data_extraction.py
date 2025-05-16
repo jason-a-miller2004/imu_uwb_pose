@@ -36,6 +36,7 @@ def extract_footposer(action_path, config, smpl, skiprate=1):
     sensor_data = np.concatenate([left_imu, right_imu, uwb_dists, left_altitude, right_altitude], axis=1)
     # convert to torch tensor
     sensor_data = torch.tensor(sensor_data, dtype=torch.float32)[sensor_start:sensor_finish, :]
+    print(f'sensor data shape {sensor_data.shape}')
 
     # load the mocap data
     mocap_file = [f for f in files if f.endswith("stageii.pkl")][0]
@@ -193,26 +194,7 @@ def extract_angle_amass(pose, config, all=False):
     selected_rotations = R.from_matrix(selected_rotations.cpu().numpy())
     selected_rotations = selected_rotations.as_rotvec()
 
-    selected_rotations = torch.tensor(selected_rotations.reshape(-1, num_joints, 3), device=config.device)
-
-    # Convert to numpy for visualization
-    selected_rotations_np = selected_rotations.cpu().numpy()
-
-    # Plot each joint's three rotation components
-    time_steps = selected_rotations_np.shape[0]
-
-    # for joint_idx in range(num_joints):
-    #     plt.figure(figsize=(8, 5))
-    #     plt.plot(range(time_steps), selected_rotations_np[:, joint_idx, 0], label="X-axis")
-    #     plt.plot(range(time_steps), selected_rotations_np[:, joint_idx, 1], label="Y-axis")
-    #     plt.plot(range(time_steps), selected_rotations_np[:, joint_idx, 2], label="Z-axis")
-
-    #     plt.xlabel("Time Step")
-    #     plt.ylabel("Rotation (radians)")
-    #     plt.title(f"Joint {absolute_joints[joint_idx]} Rotation Over Time")
-    #     plt.legend()
-    #     plt.grid(True)
-    #     plt.show()
+    selected_rotations = torch.tensor(selected_rotations.reshape(-1, num_joints, 3))
 
     return selected_rotations
 
