@@ -111,5 +111,5 @@ if __name__=="__main__":
                             batch_size=1,
                             ext='npz',
                             age='adult').to(config.device)
-    process_amass(config, smpl)
+    # process_amass(config, smpl)
     process_footPoser(config, smpl)

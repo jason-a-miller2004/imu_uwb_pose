@@ -6,17 +6,6 @@ from scipy.spatial.transform import Rotation as R
 import numpy as np
 import torch
 import time
-import smplx
-
-config = c.config()
-
-outputs = torch.load("outputs.pt")
-
-body_model = smplx.create(config.body_model, model_type='smplx',
-                         gender='neutral', use_face_contour=False,
-                         batch_size=1,
-                         ext='npz',
-                         age='adult').to(config.device)
 
 # calculate mean joint angle error
 # only for the first 22 joints
@@ -92,9 +81,9 @@ def mean_joint_angle_error(pred, gt, lengths, config):
 
     print(f'means shape ', means.shape)
     print(means)
-    return np.mean(means)
+    return means
 
-def mean_joint_and_vertex_error(pred, gt, lengths, config, translation=True):
+def mean_joint_and_vertex_error(pred, gt, lengths, config, body_model):
     """
     Computes:
       1) Mean Per Joint Position Error (MPJPE) for the first 22 joints.
@@ -161,26 +150,20 @@ def mean_joint_and_vertex_error(pred, gt, lengths, config, translation=True):
     vert_diff  = vert_diff.reshape(B, max_len, V)
 
     # 6) Accumulate sums up to each sequence’s length, then compute final average
-    total_joint_sum = 0.0
-    total_vert_sum  = 0.0
+    sum_joint_diffs = np.zeros(22,)
+    sum_vert_diffs = np.zeros(V,)
     total_frames    = 0
 
     for i in range(B):
         seq_len = lengths[i]
-        # For each frame up to seq_len:
-        # - average over 22 joints
-        # - average over V vertices
-        # Then accumulate.
-        seq_joints_mean = joint_diff[i, :seq_len].mean()  # scalar: mean over (seq_len * 22)
-        seq_verts_mean  = vert_diff[i, :seq_len].mean()   # scalar: mean over (seq_len * V)
 
-        total_joint_sum += seq_joints_mean * seq_len
-        total_vert_sum  += seq_verts_mean  * seq_len
+        sum_joint_diffs += joint_diff[i, :seq_len].sum(axis=0) # scalar: mean over (seq_len * 22)
+        sum_vert_diffs  += vert_diff[i, :seq_len].sum(axis=0)  # scalar: mean over (seq_len * V)
         total_frames    += seq_len
 
     # Average in meters
-    mpjpe_meters = total_joint_sum / float(total_frames)
-    mpjve_meters = total_vert_sum  / float(total_frames)
+    mpjpe_meters = sum_joint_diffs / float(total_frames)
+    mpjve_meters = sum_vert_diffs  / float(total_frames)
 
     # Convert to centimeters
     mpjpe_cm = 100.0 * mpjpe_meters
@@ -188,7 +171,7 @@ def mean_joint_and_vertex_error(pred, gt, lengths, config, translation=True):
 
     return mpjpe_cm, mpjve_cm
 
-def mean_per_joint_jitter(pred, lengths, config):
+def mean_per_joint_jitter(pred, lengths, body_model, config):
     """
     Computes the *average jerk* (3rd derivative) for each of the 22 body joints
     in the SMPL model. Returns an array of shape (22,) with the mean jerk magnitude
@@ -247,113 +230,51 @@ def mean_per_joint_jitter(pred, lengths, config):
     else:
         per_joint_jitter = np.zeros((22,), dtype=np.float64)
 
-    return np.mean(per_joint_jitter)
+    return per_joint_jitter
 
-# def visualize(pred):
-#         smpl_input = default_smpl_input(pred.shape[0], config)
+def get_metrics(outputs, smpl, config):
+    angle_error = np.zeros(22,)
+    joint_error = np.zeros(22,)
+    vertex_error = np.zeros(10475,)
+    jitter = np.zeros(22,)
 
-#         smpl_input['global_orient'] = pred[:, :3]
-#         smpl_input['body_pose'] = pred[:, 3:66]
-#         smpl_input['transl'] = pred[:, 66:]
+    for i in range(len(outputs)):
+        # convert pred and true to axis angle
+        pred_r6d = outputs[i]['pred'].reshape(-1, 6)
+        true_r6d = outputs[i]['true'].reshape(-1, 6)
 
-#         output = body_model(**smpl_input)
-#         vertices = output.vertices.detach().cpu().numpy()
-#         faces = body_model.faces
+        pred_aa = torch.tensor(r6d_to_axis_angle(pred_r6d), dtype=torch.float32).to(config.device)
+        true_aa = torch.tensor(r6d_to_axis_angle(true_r6d), dtype=torch.float32).to(config.device)
 
-#         visualize_frames_open3d(vertices, faces, fps=30)
+        pred = pred_aa.reshape(-1, config.max_sample_length, 22, 3)
+        true = true_aa.reshape(-1, config.max_sample_length, 22, 3)
+        lengths = outputs[i]['lengths']
+        print(f'processing output {i} pred shape {pred.shape} true shape {true.shape}')
 
-# def visualize_frames_open3d(frames, faces, fps=120):
-#     """
-#     Visualize a list of (N, 3) point sets in an Open3D window as a mesh,
-#     refreshing at the specified fps (default 120Hz).
+        mean_angle_error = mean_joint_angle_error(pred, true, lengths, config)
+        angle_error += mean_angle_error
+        
+        mean_joint_error, mean_vertex_error = mean_joint_and_vertex_error(pred, true, lengths, config, smpl)
+        joint_error += mean_joint_error
+        vertex_error += mean_vertex_error
 
-#     Args:
-#         frames (list or array-like): A sequence of arrays, each of shape (N, 3).
-#                                      Each array in 'frames' represents the vertex
-#                                      positions for that frame.
-#         faces (array-like): An array of shape (M, 3), each row containing the vertex
-#                             indices for one triangular face.
-#         fps (int): Frames per second to update the visualization.
-#     """
+        mean_jitter = mean_per_joint_jitter(pred, lengths, smpl, config)
+        jitter += mean_jitter
 
-#     # Create a TriangleMesh geometry
-#     mesh = o3d.geometry.TriangleMesh()
 
-#     # Create a Visualizer window
-#     vis = o3d.visualization.Visualizer()
-#     vis.create_window(window_name='Open3D Mesh', width=1280, height=720)
+    angle_error = angle_error / len(outputs)
+    joint_error = joint_error / len(outputs)
+    vertex_error = vertex_error / len(outputs)
+    jitter = jitter / len(outputs)
 
-#     # Optionally add a coordinate frame (useful for reference)
-#     coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(
-#         size=0.5, origin=[0, 0, 0]
-#     )
-#     vis.add_geometry(coordinate_frame)
-
-#     # Add the initial mesh to the visualizer
-#     vis.add_geometry(mesh)
-
-#     # Calculate the time interval between frames
-#     frame_interval = 1.0 / fps
-
-#     mesh.triangles = o3d.utility.Vector3iVector(faces)
-
-#     for i, frame_data in enumerate(frames):
-#         # Update the mesh's vertices
-#         mesh.vertices = o3d.utility.Vector3dVector(frame_data)
-#         mesh.compute_vertex_normals()
-
-#         # Update geometry in the visualizer
-#         vis.update_geometry(mesh)
-#         vis.poll_events()
-
-#         # Optionally reset the viewpoint on the first frame
-#         if i == 0:
-#             vis.reset_view_point(True)
-
-#         vis.update_renderer()
-
-#         # Wait briefly to maintain your desired fps
-#         time.sleep(frame_interval)
-
-#     # Once done, close the window
-#     vis.destroy_window()
-
-angle_error = 0.0
-joint_error = 0.0
-vertex_error = 0.0
-jitter = 0.0
-
-for i in range(len(outputs)):
-    # convert pred and true to axis angle
-    pred_r6d = outputs[i]['pred'].reshape(-1, 6)
-    true_r6d = outputs[i]['true'].reshape(-1, 6)
-
-    pred_aa = torch.tensor(r6d_to_axis_angle(pred_r6d), dtype=torch.float32).to(config.device)
-    true_aa = torch.tensor(r6d_to_axis_angle(true_r6d), dtype=torch.float32).to(config.device)
-
-    pred = pred_aa.reshape(-1, config.max_sample_length, 22, 3)
-    true = true_aa.reshape(-1, config.max_sample_length, 22, 3)
-    lengths = outputs[i]['lengths']
-    print(f'processing output {i} pred shape {pred.shape} true shape {true.shape}')
-
-    mean_angle_error = mean_joint_angle_error(pred, true, lengths, config)
-    angle_error += mean_angle_error
-    print('angle error ', mean_angle_error)
+    print(f'angle error {np.mean(angle_error)}')
+    print(f'joint error {np.mean(joint_error)}')
+    print(f'vertex error {np.mean(vertex_error)}')
+    print(f'jitter error {np.mean(jitter)}')
     
-    mean_joint_error, mean_vertex_error = mean_joint_and_vertex_error(pred, true, lengths, config, translation=True)
-    joint_error += mean_joint_error
-    vertex_error += mean_vertex_error
-    print('joint error ', mean_joint_error)
-    print('vertex error ', mean_vertex_error)
-
-    mean_jitter = mean_per_joint_jitter(pred, lengths, config)
-    jitter += mean_jitter
-    print('mean per joint jitter ', mean_jitter)
-    print()
-
-print("------------------------------------")
-print("------------------------------------")
-print(f'average angle error {angle_error / len(outputs)}')
-print(f'average joint error {joint_error / len(outputs)}')
-print(f'average vertex error {vertex_error / len(outputs)}')
-print(f'average jitter {jitter / len(outputs)}')
+    return {
+        'angle_error': angle_error,
+        'joint_error': joint_error,
+        'vertex_error': vertex_error,
+        'jitter': jitter
+    }

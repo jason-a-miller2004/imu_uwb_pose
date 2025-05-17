@@ -19,10 +19,20 @@ class footposer_dataset(Dataset):
 
         dir = os.path.join(config.processed_pose, "FootPoser", "train" if self.train else "test")
 
+        if not os.path.exists(dir):
+            self.x = x
+            self.y = y
+            self.joints = joints
+
+            return
+
         subjects = os.listdir(dir)
 
         for subject in subjects:
             subject_dir = os.path.join(dir, subject)
+
+            if not os.path.exists(subject_dir):
+                continue
 
             actions = os.listdir(subject_dir)
 

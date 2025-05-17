@@ -90,13 +90,13 @@ if __name__ == "__main__":
     # set up WandB logger
     wandb_logger = WandbLogger(project=experiment, save_dir=checkpoint_path)
 
-    early_stopping_callback = EarlyStopping(
-        monitor="validation_step_loss",
-        mode="min",
-        verbose=False,
-        min_delta=0.00001,
-        patience=5
-    )
+    # early_stopping_callback = EarlyStopping(
+    #     monitor="validation_step_loss",
+    #     mode="min",
+    #     verbose=False,
+    #     min_delta=0.00001,
+    #     patience=5
+    # )
     checkpoint_callback = ModelCheckpoint(
         monitor="validation_step_loss",
         mode="min",
@@ -120,10 +120,10 @@ if __name__ == "__main__":
     trainer = pl.Trainer(
         fast_dev_run=False,
         logger=wandb_logger,
-        max_epochs=5,
+        max_epochs=20,
         accelerator=accelerator,
         devices=devices,
-        callbacks=[early_stopping_callback, checkpoint_callback],
+        callbacks=[checkpoint_callback],
         deterministic=True
     )
 

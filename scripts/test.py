@@ -4,8 +4,10 @@ import os
 import argparse
 import pytorch_lightning as pl
 import torch
+import smplx
+import pickle
 
-from imu_uwb_pose import config as c
+from imu_uwb_pose import config as c, eval_metrics as e
 from imu_uwb_pose.training.imu_uwb_model import imu_uwb_pose_model
 from imu_uwb_pose.training.utils import imu_uwb_data_module as imu_uwb_data_module
 
@@ -35,7 +37,7 @@ if __name__ == "__main__":
     # Optional: if --finetune is set, do something special here
     if args.finetune:
         config = c.config(
-            experiment=args.experiment + "-finetune",
+            experiment=args.experiment,
             dataset="footposer_dataset"
         )
     else:
@@ -74,7 +76,7 @@ if __name__ == "__main__":
     # -------------------------------------------------------------------------
     if config.device.type == 'cuda':
         accelerator = "gpu"
-        devices = [6]
+        devices = [0]
         print("Testing on GPU...")
     else:
         accelerator = "cpu"
@@ -90,9 +92,19 @@ if __name__ == "__main__":
     print("Running model predictions on the test set...")
     outputs = trainer.predict(model, datamodule=datamodule)
 
-    torch.save(outputs, "outputs.pt")
+    body_model = smplx.create(config.body_model, model_type='smplx',
+                         gender='neutral', use_face_contour=False,
+                         batch_size=1,
+                         ext='npz',
+                         age='adult').to(config.device)
 
-    print("Predictions saved to 'outputs.pt'.")
-    print("Test run complete.")
+    errors_dict = e.get_metrics(outputs, body_model, config)
+
+    # save metrics to pose_models file
+    save_path = os.path.join(config.checkpoint_path, "error_metrics.pkl")
+    with open(save_path, "wb") as f:
+        pickle.dump(errors_dict, f)
+
+    print("Saved errors to " + save_path)
 
 
