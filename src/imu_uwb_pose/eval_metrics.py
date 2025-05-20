@@ -17,9 +17,6 @@ def mean_joint_angle_error(pred, gt, lengths, config):
     pred_orient = de.extract_angle_amass(pred, config, True).cpu().numpy()
     gt_orient = de.extract_angle_amass(gt, config, True).cpu().numpy()
 
-    print('pred shape ', pred_orient.shape)
-    print('gt shape ', gt_orient.shape)
-
     pred_orient = pred_orient.reshape(-1, 3)
     gt_orient = gt_orient.reshape(-1, 3)
 
@@ -36,7 +33,6 @@ def mean_joint_angle_error(pred, gt, lengths, config):
 
     # Transpose gt matrices
     gt_trans = np.transpose(gt_rot_matrix, [0, 2, 1])
-    print('gt trans shape ', gt_trans.shape)
 
     # compute R1 * R2.T, if prediction and target match, this will be the identity matrix
     r = np.matmul(pred_rot_matrix, gt_trans)
@@ -79,8 +75,6 @@ def mean_joint_angle_error(pred, gt, lengths, config):
     total_frames = np.sum(lengths)
     means = sums / total_frames
 
-    print(f'means shape ', means.shape)
-    print(means)
     return means
 
 def mean_joint_and_vertex_error(pred, gt, lengths, config, body_model):
@@ -266,11 +260,6 @@ def get_metrics(outputs, smpl, config):
     joint_error = joint_error / len(outputs)
     vertex_error = vertex_error / len(outputs)
     jitter = jitter / len(outputs)
-
-    print(f'angle error {np.mean(angle_error)}')
-    print(f'joint error {np.mean(joint_error)}')
-    print(f'vertex error {np.mean(vertex_error)}')
-    print(f'jitter error {np.mean(jitter)}')
     
     return {
         'angle_error': angle_error,

@@ -28,14 +28,14 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--finetune",
-        action="store_true",
+        type=str,
         help="If set, the script will run in fine-tuning mode (optional)."
     )
 
     parser.add_argument(
         "--lr",
         type=float,
-        default=1e-3,
+        default=3e-3,
         help="Learning rate for the optimizer."
     )
     args = parser.parse_args()
@@ -49,7 +49,8 @@ if __name__ == "__main__":
         config = c.config(
             experiment=args.experiment,
             dataset="footposer_dataset",
-            lr=args.lr
+            lr=args.lr,
+            name=args.finetune
         )
 
         # load the checkpoint path
@@ -120,7 +121,7 @@ if __name__ == "__main__":
     trainer = pl.Trainer(
         fast_dev_run=False,
         logger=wandb_logger,
-        max_epochs=20,
+        max_epochs=10,
         accelerator=accelerator,
         devices=devices,
         callbacks=[checkpoint_callback],

@@ -10,6 +10,7 @@ import pickle
 from imu_uwb_pose import config as c, eval_metrics as e
 from imu_uwb_pose.training.imu_uwb_model import imu_uwb_pose_model
 from imu_uwb_pose.training.utils import imu_uwb_data_module as imu_uwb_data_module
+import numpy as np
 
 
 if __name__ == "__main__":
@@ -25,20 +26,29 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--finetune",
-        action="store_true",
+        type=str,
         help="If set, the script will run in fine-tuning mode (optional)."
     )
+
+    parser.add_argument(
+        "--lr",
+        type=str,
+        required=True,
+        help="Current learning rate being tested"
+    )
+
     args = parser.parse_args()
 
     # -------------------------------------------------------------------------
     # 2) Initialize config with the provided experiment name
     # -------------------------------------------------------------------------
 
-    # Optional: if --finetune is set, do something special here
+    # Optional: if --finetune is set
     if args.finetune:
         config = c.config(
             experiment=args.experiment,
-            dataset="footposer_dataset"
+            dataset="footposer_dataset",
+            name=args.finetune
         )
     else:
         config = c.config(
@@ -98,12 +108,28 @@ if __name__ == "__main__":
                          ext='npz',
                          age='adult').to(config.device)
 
-    errors_dict = e.get_metrics(outputs, body_model, config)
+    err_dict = e.get_metrics(outputs, body_model, config)
 
-    # save metrics to pose_models file
-    save_path = os.path.join(config.checkpoint_path, "error_metrics.pkl")
+    angle_err = np.mean(err_dict['angle_error'])
+    joint_err = np.mean(err_dict['joint_error'])
+    vertex_err = np.mean(err_dict['vertex_error'])
+    jitter_err = np.mean(err_dict['jitter'])
+
+    print(f'{args.finetune} results')
+    print(f'angle error {angle_err}')
+    print(f'joint error {joint_err}')
+    print(F'vertex error {vertex_err}')
+    print(f'jitter_err {jitter_err}')
+    
+
+
+    save_dir = os.path.relpath(f"./data/results/LOO_{args.lr}")
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    save_path = os.path.join(save_dir, f"{args.finetune}_error_metrics.pkl")
     with open(save_path, "wb") as f:
-        pickle.dump(errors_dict, f)
+        pickle.dump(err_dict, f)
 
     print("Saved errors to " + save_path)
 

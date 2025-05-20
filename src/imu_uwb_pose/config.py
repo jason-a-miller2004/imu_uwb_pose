@@ -4,11 +4,12 @@ import numpy as np
 import datetime
 
 class config:
-    def __init__(self, experiment=None, dataset=None, lr=1e-3):
+    def __init__(self, experiment=None, dataset=None, lr=1e-3, name=None):
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.root_dir = Path().absolute()
         self.dataset = dataset
         self.experiment = experiment
+        self.name = name
         self.lr = lr
         if self.experiment != None:
             self.checkpoint_path = self.root_dir / f"pose_models/checkpoints/{self.experiment}"
@@ -19,7 +20,7 @@ class config:
                   'DanceDB', 'DFaust', 'EKUT', 'EyesJapanDataset', 'GRAB', 'HDM05', 'HUMAN4D', 'HumanEva', 'KIT', 'MoSh', 'PosePrior', 'SFU', 'SOMA', 'SSM', 'TCDHands', 'TotalCapture', 'Transitions']
     
     raw_amass = './data/raw/amass'
-    raw_footposer = './data/raw/FootPoser'
+    raw_footposer = './data/raw/FootPoser_filtered'
     processed_pose = './data/processed'
     body_model = './body_models'
     absolute_joint_angles = [7, 8] # left and right joint angles

@@ -5,7 +5,7 @@ class RNN(nn.Module):
     r"""
     An RNN Module including a linear input layer, an RNN, and a linear output layer.
     """
-    def __init__(self, n_input, n_output, n_hidden, n_rnn_layer=2, bidirectional=True, dropout=0.2):
+    def __init__(self, n_input, n_output, n_hidden, n_rnn_layer=2, bidirectional=True, dropout=0.7):
         super(RNN, self).__init__()
         self.rnn = nn.LSTM(n_hidden, n_hidden, n_rnn_layer, bidirectional=bidirectional, batch_first=True)
         self.linear1 = nn.Linear(n_input, n_hidden)

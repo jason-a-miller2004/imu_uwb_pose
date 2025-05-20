@@ -20,22 +20,22 @@ def extract_footposer(action_path, config, smpl, skiprate=1):
     smpl_start, smpl_finish, sensor_start, sensor_finish = int(data[0]), int(data[1]), int(data[2]), int(data[3])
 
     # extract the sensor data and format it
-    sensor_file = [f for f in files if f.endswith("orientation.pkl")][0]
+    sensor_file = [f for f in files if f.endswith("filtered.pkl")][0]
     sensor_path = os.path.join(action_path, sensor_file)
     with open(sensor_path, 'rb') as file:
         sensor_data = pickle.load(file)
 
     # combine in order left_imu, right_imu, uwb_dists
-    left_imu = u.rotation_matrix_to_r6d(torch.tensor(sensor_data['left_imu']))
-    right_imu = u.rotation_matrix_to_r6d(torch.tensor(sensor_data['right_imu']))
-    uwb_dists = sensor_data['uwb']
-    left_altitude = sensor_data['left_altitude'][:, np.newaxis]
-    right_altitude = sensor_data['right_altitude'][:, np.newaxis]
+    left_imu = u.rotation_matrix_to_r6d(torch.tensor(sensor_data['left_imu']))[sensor_start:sensor_finish, :]
+    right_imu = u.rotation_matrix_to_r6d(torch.tensor(sensor_data['right_imu']))[sensor_start:sensor_finish, :]
+    uwb_dists = sensor_data['uwb'][sensor_start:sensor_finish, :]
+    left_altitude = sensor_data['left_altitude_filtered'][:, np.newaxis]
+    right_altitude = sensor_data['right_altitude_filtered'][:, np.newaxis]
 
     # concat all the fields into left imu, right imu, uwb dists
     sensor_data = np.concatenate([left_imu, right_imu, uwb_dists, left_altitude, right_altitude], axis=1)
     # convert to torch tensor
-    sensor_data = torch.tensor(sensor_data, dtype=torch.float32)[sensor_start:sensor_finish, :]
+    sensor_data = torch.tensor(sensor_data, dtype=torch.float32)
     print(f'sensor data shape {sensor_data.shape}')
 
     # load the mocap data

@@ -68,12 +68,15 @@ def process_amass(config, smpl):
                 torch.save(output, save_path)
 
 def process_footPoser(config, smpl):
-    processed_dir = os.path.join(config.processed_pose, "FootPoser")
+    processed_dir = os.path.join(config.processed_pose, "FootPoser_filtered")
 
     for subject in os.listdir(config.raw_footposer):
 
         for action in os.listdir(os.path.join(config.raw_footposer, subject)):
             action_path = os.path.join(config.raw_footposer, subject, action)
+
+            if (not os.path.isdir(action_path)):
+                continue
 
             if subject == 'richard' and action.endswith("1"):
                 print(f'action path {action_path} has 120hz')
