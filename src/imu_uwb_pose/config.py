@@ -17,15 +17,16 @@ class config:
         
     torch_seed = 42
     amass_datasets = ['ACCAD', 'BMLmovi', 'CMU',
-                  'DanceDB', 'DFaust', 'EKUT', 'EyesJapanDataset', 'GRAB', 'HDM05', 'HUMAN4D', 'HumanEva', 'KIT', 'MoSh', 'PosePrior', 'SFU', 'SOMA', 'SSM', 'TCDHands', 'TotalCapture', 'Transitions']
+                  'DanceDB', 'DFaust', 'EKUT', 'Eyes_Japan_Dataset', 'GRAB', 'HDM05', 'HUMAN4D', 'HumanEva', 'KIT', 'MoSh', 'PosePrior', 'SFU', 'SOMA', 'SSM', 'TCDHands', 'TotalCapture', 'Transitions']
     
-    raw_amass = './data/raw/amass'
+    raw_amass = '/media/lichard/8E98F15098F136F5/amass'
     raw_footposer = './data/raw/FootPoser_filtered'
     processed_pose = './data/processed'
     body_model = './body_models'
     absolute_joint_angles = [7, 8] # left and right joint angles
     uwb_dists = [(7,8)]
     uwb_floor_dists = [7,8]
+    acceleration_joints = [7,8]
     train_pct = 0.9
 
     # done with 30 fps in mind. If fps is different, change this value

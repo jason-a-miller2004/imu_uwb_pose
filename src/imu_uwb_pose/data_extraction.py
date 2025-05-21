@@ -31,9 +31,10 @@ def extract_footposer(action_path, config, smpl, skiprate=1):
     uwb_dists = sensor_data['uwb'][sensor_start:sensor_finish, :]
     left_altitude = sensor_data['left_altitude_filtered'][:, np.newaxis]
     right_altitude = sensor_data['right_altitude_filtered'][:, np.newaxis]
-
+    left_accel = sensor_data['left_accel'][sensor_start: sensor_finish]
+    right_accel = sensor_data['right_accel'][sensor_start: sensor_finish]
     # concat all the fields into left imu, right imu, uwb dists
-    sensor_data = np.concatenate([left_imu, right_imu, uwb_dists, left_altitude, right_altitude], axis=1)
+    sensor_data = np.concatenate([left_imu, right_imu, uwb_dists, left_altitude, right_altitude, left_accel, right_accel], axis=1)
     # convert to torch tensor
     sensor_data = torch.tensor(sensor_data, dtype=torch.float32)
     print(f'sensor data shape {sensor_data.shape}')
@@ -129,6 +130,10 @@ def extract_amass(cdata, smpl, config):
     floor_distances = extract_dist_floor_amass(trans_joints, config)
     # print(f'Floor distances shape: {floor_distances.shape}')
 
+    # extract acceleration
+    accel = extract_acceleration_amass(joints,config)
+    accel = accel.reshape(-1, 6)
+
     # convert angles from axis-angle to r6d
     num_angles = angles.shape[1]
     angles = angles.reshape(-1, 3)
@@ -141,7 +146,7 @@ def extract_amass(cdata, smpl, config):
     angles_reshaped = angles.reshape(angles.shape[0], -1)
 
     # concat so that the shape is (frames, (angle1, angle2, ..., uwb dist 1, uwb dist 2, ..., uwb1 to floor1, uwb2 to floor2))
-    combined_features = torch.cat([angles_reshaped, uwb_distances, floor_distances], dim=1)
+    combined_features = torch.cat([angles_reshaped, uwb_distances, floor_distances, accel], dim=1)
     print(f'Combined features shape: {combined_features.shape}')
 
     # convert global orient and body pose to r6d
@@ -150,8 +155,10 @@ def extract_amass(cdata, smpl, config):
     body_pose = pose[:,3:66].reshape(-1, 3)
     body_r6d = utils.axis_angle_to_r6d(body_pose)
     body_r6d = body_r6d.reshape(-1, 21, 6)
-
     params = torch.cat([global_r6d, body_r6d], dim=1)
+
+    # get deltaTrans by subtracting initial translation
+    deltaTran = tran - tran[0]
 
     print(f'Params shape: {params.shape}')
     print(f'Joints shape: {joints.shape}')
@@ -160,6 +167,7 @@ def extract_amass(cdata, smpl, config):
         'x': combined_features.detach().cpu().type(torch.float32),
         'y': params.detach().cpu().type(torch.float32),
         'joints': joints.detach().cpu().type(torch.float32)[:, 0:22, :],
+        'trans': deltaTran
     }
 
 
@@ -218,6 +226,27 @@ def extract_uwb_amass(joints, config):
 
     return uwb_distances  # Torch tensor of shape (frames, len(uwb_dists))
 
+def extract_acceleration_amass(joints, config):
+    pos_vecs_idces = torch.tensor(config.acceleration_joints)
+
+    pos = joints[:, pos_vecs_idces, :]
+
+        # Δt in seconds between frames
+    dt = 1.0 / float(30)
+
+    # First-order finite differences → velocity  (T-1, M, 3)
+    vel = (pos[1:] - pos[:-1]) / dt
+
+    # Second-order finite differences → acceleration  (T-2, M, 3)
+    acc = (vel[1:] - vel[:-1]) / dt
+
+    # Pad to original length: prepend and append zeros
+    acc = torch.nn.functional.pad(acc,   # pad last dim first → (0,0),
+                                  pad=(0, 0, 0, 0, 1, 1),  # pad time dim → (1,1)
+                                  mode="constant", value=0.0)
+
+    return acc
+    
 def extract_dist_floor_amass(joints, config):
     """
     Extract the distance from the floor data from the AMASS dataset

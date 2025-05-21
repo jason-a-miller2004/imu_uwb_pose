@@ -29,9 +29,9 @@ class footposer_dataset(Dataset):
         subjects = os.listdir(dir)
 
         for subject in subjects:
-            if (not self.train and subject != config.name):
+            if (not self.train and subject != config.name and config.name != 'all'):
                 continue
-            if (self.train and subject == config.name):
+            if (self.train and (subject == config.name or config.name == 'all')):
                 continue
 
             subject_dir = os.path.join(dir, subject)

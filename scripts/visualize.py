@@ -78,10 +78,17 @@ def align_output(sensor_loc, mocap_loc, config, overlay, offset):
     left_smpl_floor = smpl_floor_dists[:, 0]
     right_smpl_floor = smpl_floor_dists[:, 1]
 
-    left_sensor_floor = data['left_altitude'][offset[2]:offset[3]]
-    right_sensor_floor = data['right_altitude'][offset[2]:offset[3]]
+    left_sensor_floor = data['left_altitude_filtered'][offset[2]:offset[3]]
 
     plot_and_compare(left_smpl_floor, left_sensor_floor, overlay, title='Left Foot Above Ground', smpl_ylabel='SMPL Altitude', sensor_ylabel='Sensor Altitude')
+
+    acc = de.extract_acceleration_amass(joints, config)[offset[0]: offset[1]]
+    left_acc = acc[:, 0, :]
+    right_acc = acc[:, 1, :]
+    sens_left_acc = data['left_accel'][offset[2]:offset[3]]
+    sens_right_acc = data['right_accel'][offset[2]:offset[3]]
+
+    plot_and_compare(left_acc, sens_left_acc, overlay, title="Left ankle acceleration", smpl_ylabel="SMPL accel", sensor_ylabel="Sensor accel (m/s^2)")
     # convert left and right imus to axis angle
     left_imu_ori = data['left_imu'][offset[2]:offset[3]]
     right_imu_ori = data['right_imu'][offset[2]:offset[3]]
@@ -104,13 +111,13 @@ def align_output(sensor_loc, mocap_loc, config, overlay, offset):
 
     # now compare in visualizer
     # convert left and right smpl to rotation matrices
-    left_smpl_ori = R.from_rotvec(np.array(left_smpl_vec)).as_matrix()
-    right_smpl_ori = R.from_rotvec(np.array(right_smpl_vec)).as_matrix()
+    # left_smpl_ori = R.from_rotvec(np.array(left_smpl_vec)).as_matrix()
+    # right_smpl_ori = R.from_rotvec(np.array(right_smpl_vec)).as_matrix()
 
-    print(f'left smpl shape: {left_smpl_ori.shape}')
-    print(f'left imu shape: {left_imu_ori.shape}')
-    animate_rotations(left_smpl_ori, left_imu_ori, fps=30, axis_len=0.2)
-    animate_rotations(right_smpl_ori, right_imu_ori, fps=30, axis_len=0.2)
+    # print(f'left smpl shape: {left_smpl_ori.shape}')
+    # print(f'left imu shape: {left_imu_ori.shape}')
+    # animate_rotations(left_smpl_ori, left_imu_ori, fps=30, axis_len=0.2)
+    # animate_rotations(right_smpl_ori, right_imu_ori, fps=30, axis_len=0.2)
 
 def animate_rotations(smpl_ori, imu_ori, fps=30, axis_len=0.25):
     smpl_ori = np.asarray(smpl_ori)
@@ -162,7 +169,7 @@ def plot_and_compare(smpl_output, sensor_output, overlay, title, smpl_ylabel, se
         plt.legend()
         plt.grid(True)
         plt.tight_layout()
-        plt.show()
+        plt.savefig(f'./plots/{title}.png')
     else:
         fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(8, 6))
 
@@ -179,7 +186,9 @@ def plot_and_compare(smpl_output, sensor_output, overlay, title, smpl_ylabel, se
         ax2.legend()
 
         plt.tight_layout()
-        plt.show()
+        plt.savefig(f'./plots/{title}.png')
+
+    plt.close()
 
 def visualize_frames_open3d(frames, faces, fps=30):
     gui.Application.instance.initialize()

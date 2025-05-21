@@ -22,8 +22,8 @@ def process_amass(config, smpl):
         dataset_path = os.path.join(config.root_dir, config.raw_amass, dataset)
 
         # in jupyter amass data is nested so add the first dir in the dataset path
-        subdir = [d for d in os.listdir(dataset_path) if os.path.isdir(os.path.join(dataset_path, d))][0]
-        dataset_path = os.path.join(dataset_path, subdir)
+        # subdir = [d for d in os.listdir(dataset_path) if os.path.isdir(os.path.join(dataset_path, d))][0]
+        # dataset_path = os.path.join(dataset_path, subdir)
         
         if not os.path.exists(dataset_path):
             continue

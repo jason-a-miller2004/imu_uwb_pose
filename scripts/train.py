@@ -121,7 +121,7 @@ if __name__ == "__main__":
     trainer = pl.Trainer(
         fast_dev_run=False,
         logger=wandb_logger,
-        max_epochs=10,
+        max_epochs=20,
         accelerator=accelerator,
         devices=devices,
         callbacks=[checkpoint_callback],
