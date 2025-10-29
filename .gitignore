@@ -8,3 +8,4 @@ lightning_logs/
 scripts/.ipynb_checkpoints/
 src/.ipynb_checkpoints/
 .venv
+plots/

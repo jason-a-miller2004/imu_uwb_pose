@@ -8,14 +8,12 @@ class amass_dataset(Dataset):
         self.data = self.load_data(config)
         self.config = config
         
-
     def __len__(self):
         return len(self.x)
     
     def load_data(self, config):
         x = []
         y = []
-        joints = []
 
         dir = os.path.join(config.processed_pose, "AMASS", "train" if self.train else "test")
 
@@ -37,15 +35,12 @@ class amass_dataset(Dataset):
                     data = torch.load(action_path, weights_only=True)
 
                     x_split = torch.split(data['x'], config.max_sample_length)
-                    y_split = torch.split(data['y'], config.max_sample_length)
-                    joint_split = torch.split(data['joints'], config.max_sample_length)
+                    y_split = torch.split(data['trans'], config.max_sample_length)
                     x.extend(x_split)
                     y.extend(y_split)
-                    joints.extend(joint_split)
         self.x = x
         self.y = y
-        self.joints = joints
 
     def __getitem__(self, idx):
         # Extract the angles
-        return (self.x[idx], self.y[idx], self.joints[idx])
+        return (self.x[idx], self.y[idx])

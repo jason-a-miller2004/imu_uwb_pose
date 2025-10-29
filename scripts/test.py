@@ -7,9 +7,10 @@ import torch
 import smplx
 import pickle
 
-from imu_uwb_pose import config as c, eval_metrics as e
-from imu_uwb_pose.training.imu_uwb_model import imu_uwb_pose_model
+from imu_uwb_pose import config as c
+from imu_uwb_pose.training.imu_uwb_pose_model import imu_uwb_pose_model as model
 from imu_uwb_pose.training.utils import imu_uwb_data_module as imu_uwb_data_module
+from imu_uwb_pose.eval_metrics import get_metrics
 import numpy as np
 
 
@@ -24,37 +25,28 @@ if __name__ == "__main__":
         required=True,
         help="Name of the experiment to run. Corresponds to config.experiment."
     )
+
     parser.add_argument(
-        "--finetune",
+        "--loo",
         type=str,
-        help="If set, the script will run in fine-tuning mode (optional)."
+        required=False,
+        help="test subject to leave out if doing loo cross validation"
     )
 
     parser.add_argument(
-        "--lr",
+        "--dataset",
         type=str,
         required=True,
-        help="Current learning rate being tested"
+        help="name of the dataset to use"
     )
 
     args = parser.parse_args()
 
-    # -------------------------------------------------------------------------
-    # 2) Initialize config with the provided experiment name
-    # -------------------------------------------------------------------------
-
-    # Optional: if --finetune is set
-    if args.finetune:
-        config = c.config(
-            experiment=args.experiment,
-            dataset="footposer_dataset",
-            name=args.finetune
-        )
-    else:
-        config = c.config(
-            experiment=args.experiment,
-            dataset="amass_dataset"
-        )
+    config = c.config(
+        experiment=args.experiment,
+        dataset=args.dataset,
+        name=args.loo
+    )
 
     # -------------------------------------------------------------------------
     # 3) Read the best model path from best_model.txt
@@ -70,7 +62,7 @@ if __name__ == "__main__":
     # 4) Load the best model
     #    Note: map_location is set to config.device (e.g., CPU or GPU).
     # -------------------------------------------------------------------------
-    model = imu_uwb_pose_model.load_from_checkpoint(
+    model = model.load_from_checkpoint(
         best_model_path,
         map_location=config.device,
         config=config
@@ -101,33 +93,32 @@ if __name__ == "__main__":
 
     print("Running model predictions on the test set...")
     outputs = trainer.predict(model, datamodule=datamodule)
-
+    loss = outputs[0]['loss']
+    print(f'loss {loss}')
     body_model = smplx.create(config.body_model, model_type='smplx',
                          gender='neutral', use_face_contour=False,
                          batch_size=1,
                          ext='npz',
                          age='adult').to(config.device)
 
-    err_dict = e.get_metrics(outputs, body_model, config)
+    err_dict = get_metrics(outputs, body_model, config)
 
     angle_err = np.mean(err_dict['angle_error'])
     joint_err = np.mean(err_dict['joint_error'])
     vertex_err = np.mean(err_dict['vertex_error'])
     jitter_err = np.mean(err_dict['jitter'])
 
-    print(f'{args.finetune} results')
+    print(f'{args.loo} results')
     print(f'angle error {angle_err}')
     print(f'joint error {joint_err}')
     print(F'vertex error {vertex_err}')
     print(f'jitter_err {jitter_err}')
-    
 
-
-    save_dir = os.path.relpath(f"./data/results/LOO_{args.lr}")
+    save_dir = os.path.relpath(f"./data/results/{args.experiment}")
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
-    save_path = os.path.join(save_dir, f"{args.finetune}_error_metrics.pkl")
+    save_path = os.path.join(save_dir, f"{args.loo}_error_metrics.pkl")
     with open(save_path, "wb") as f:
         pickle.dump(err_dict, f)
 

@@ -13,11 +13,13 @@ class config:
         self.lr = lr
         if self.experiment != None:
             self.checkpoint_path = self.root_dir / f"pose_models/checkpoints/{self.experiment}"
+            if self.name:
+                self.checkpoint_path = self.checkpoint_path / f'{self.name}'
             self.checkpoint_path.mkdir(exist_ok=True, parents=True)
         
     torch_seed = 42
     amass_datasets = ['ACCAD', 'BMLmovi', 'CMU',
-                  'DanceDB', 'DFaust', 'EKUT', 'Eyes_Japan_Dataset', 'GRAB', 'HDM05', 'HUMAN4D', 'HumanEva', 'KIT', 'MoSh', 'PosePrior', 'SFU', 'SOMA', 'SSM', 'TCDHands', 'TotalCapture', 'Transitions']
+                  'DanceDB', 'DFaust', 'EKUT', 'Eyes_Japan_Dataset', 'HDM05', 'HUMAN4D', 'HumanEva', 'KIT', 'MoSh', 'PosePrior', 'SFU', 'SOMA', 'SSM', 'TCDHands', 'TotalCapture', 'Transitions']
     
     raw_amass = '/media/lichard/8E98F15098F136F5/amass'
     raw_footposer = './data/raw/FootPoser_filtered'

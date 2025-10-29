@@ -6,6 +6,7 @@ from scipy.spatial.transform import Rotation as R
 import numpy as np
 import torch
 import time
+import pickle
 
 # calculate mean joint angle error
 # only for the first 22 joints
@@ -226,6 +227,29 @@ def mean_per_joint_jitter(pred, lengths, body_model, config):
 
     return per_joint_jitter
 
+def mean_trans_sec_err(pred, target, lengths):
+    sec_errs = []
+    f = 30
+    for i in range(len(lengths)):
+        if (lengths[i] != 150):
+            continue
+        joint_p = pred[i]
+        joint_t = target[i]
+        te = ((joint_p[f:,] - joint_p[:-f,]) - (joint_t[f:,] - joint_t[:-f,])).norm(dim=1)*100    # N, 1
+
+        sec_errs.append(te)
+
+    return np.asarray(sec_errs)
+
+def mean_drift_err(pred, target, lengths):
+    f = 30
+    for i in range(len(lengths)):
+        if (lengths[i] != 150):
+            continue
+        joint_p = pred[i]
+        joint_t = target[i]
+        drift = ((joint_p - joint_p[0,:]) - (joint_t - joint_t[0,:])).norm(dim=1) * 100
+        print(f'drift {drift}')
 def get_metrics(outputs, smpl, config):
     angle_error = np.zeros(22,)
     joint_error = np.zeros(22,)
@@ -242,6 +266,7 @@ def get_metrics(outputs, smpl, config):
 
         pred = pred_aa.reshape(-1, config.max_sample_length, 22, 3)
         true = true_aa.reshape(-1, config.max_sample_length, 22, 3)
+
         lengths = outputs[i]['lengths']
         print(f'processing output {i} pred shape {pred.shape} true shape {true.shape}')
 
@@ -267,3 +292,17 @@ def get_metrics(outputs, smpl, config):
         'vertex_error': vertex_error,
         'jitter': jitter
     }
+
+def get_trans_metrics(outputs):
+    avg_err = 0
+    sec_errs = []
+    for i in range(len(outputs)):
+        pred = outputs[i]['pred']
+        target = outputs[i]['true']
+        lengths = outputs[i]['lengths']
+
+        err = mean_trans_sec_err(pred, target, lengths)
+        mean_drift_err(pred, target, lengths)
+        avg_err += np.mean(err)
+        sec_errs.append(err)
+    return avg_err / len(outputs)

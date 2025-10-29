@@ -16,7 +16,7 @@ class imu_uwb_pose_model(pl.LightningModule):
     """
     def __init__(self, config:config):
         super().__init__()
-        n_input = 6 * len(config.absolute_joint_angles) + len(config.uwb_dists) + len(config.uwb_floor_dists) + 3 * len(config.acceleration_joints) # add back dist above ground here
+        n_input = 6 * len(config.absolute_joint_angles) + len(config.uwb_dists) + len(config.uwb_floor_dists) # add back dist above ground here
 
         n_output_joints = 22 # change back to 23 to add back translation
         self.n_output_joints = n_output_joints

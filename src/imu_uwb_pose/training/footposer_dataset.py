@@ -17,7 +17,7 @@ class footposer_dataset(Dataset):
         y = []
         joints = []
 
-        dir = os.path.join(config.processed_pose, "FootPoser_filtered")
+        dir = os.path.join(config.processed_pose, "FootPoser")
 
         if not os.path.exists(dir):
             self.x = x
@@ -31,7 +31,7 @@ class footposer_dataset(Dataset):
         for subject in subjects:
             if (not self.train and subject != config.name and config.name != 'all'):
                 continue
-            if (self.train and (subject == config.name or config.name == 'all')):
+            if (self.train and (config.name == 'all' or config.name == subject) ):
                 continue
 
             subject_dir = os.path.join(dir, subject)
@@ -42,6 +42,12 @@ class footposer_dataset(Dataset):
             actions = os.listdir(subject_dir)
 
             for action in actions:
+                # user adaptive
+                # if (not self.train and (subject != config.name or action.find('exercises2') != -1) ):
+                #     continue
+                # if (self.train and subject == config.name and action.find('exercises2') == -1):
+                #     continue
+
                 action_path = os.path.join(subject_dir, action)
                 data = torch.load(action_path, weights_only=True)
 

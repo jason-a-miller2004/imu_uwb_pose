@@ -9,9 +9,9 @@ from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning import seed_everything
 
 import argparse
+import importlib
 
 from imu_uwb_pose import config as c
-from imu_uwb_pose.training import imu_uwb_model as model
 from imu_uwb_pose.training.utils import imu_uwb_data_module as imu_uwb_data_module
 from pathlib import Path
 
@@ -27,9 +27,23 @@ if __name__ == "__main__":
         help="Name of the experiment to run. Corresponds to config.experiment."
     )
     parser.add_argument(
-        "--finetune",
+        "--model",
         type=str,
-        help="If set, the script will run in fine-tuning mode (optional)."
+        required=True,
+        help="Name of the model to use"
+    )
+    parser.add_argument(
+        "--loo",
+        type=str,
+        required=False,
+        help="test subject to leave out if doing loo cross validation"
+    )
+
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        required=True,
+        help="name of the dataset to use"
     )
 
     parser.add_argument(
@@ -38,19 +52,31 @@ if __name__ == "__main__":
         default=3e-3,
         help="Learning rate for the optimizer."
     )
+
+    parser.add_argument(
+        "--finetune",
+        action='store_true',
+        required=False
+    )
+
     args = parser.parse_args()
 
     # -------------------------------------------------------------------------
     # 2) Use experiment argument in config
     # -------------------------------------------------------------------------
-    
+    # import lib 
+    module = importlib.import_module(f"imu_uwb_pose.training.{args.model}")
+
+    # get the model class (assuming the class has the same name as the module)
+    modelClass = getattr(module, args.model)
+
     # Optionally, do something special if --finetune was set:
     if args.finetune:
         config = c.config(
             experiment=args.experiment,
-            dataset="footposer_dataset",
+            dataset=args.dataset,
             lr=args.lr,
-            name=args.finetune
+            name=args.loo
         )
 
         # load the checkpoint path
@@ -61,7 +87,7 @@ if __name__ == "__main__":
             checkpoint_path = lines[0].strip()
 
         # load the model
-        model = model.imu_uwb_pose_model.load_from_checkpoint(
+        model = modelClass.load_from_checkpoint(
             checkpoint_path,
             config=config,
             map_location=config.device
@@ -73,14 +99,15 @@ if __name__ == "__main__":
     else:
         config = c.config(
             experiment=args.experiment,
-            dataset="amass_dataset",
-            lr=args.lr
+            dataset=args.dataset,
+            lr=args.lr,
+            name=args.loo
         )
         experiment = config.experiment
         checkpoint_path = config.checkpoint_path
 
 
-        model = model.imu_uwb_pose_model(config)
+        model = modelClass(config)
 
     # set the random seed
     seed_everything(config.torch_seed, workers=True)
@@ -121,16 +148,12 @@ if __name__ == "__main__":
     trainer = pl.Trainer(
         fast_dev_run=False,
         logger=wandb_logger,
-        max_epochs=20,
+        max_epochs=10,
         accelerator=accelerator,
         devices=devices,
         callbacks=[checkpoint_callback],
         deterministic=True
     )
-
-    # If --finetune is set, you might, for example, load a checkpoint:
-    # if args.finetune:
-    #     model.load_state_dict(torch.load("some_checkpoint.ckpt"))
 
     # log initial validation loss
     trainer.validate(model, datamodule=datamodule)

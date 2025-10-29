@@ -31,10 +31,8 @@ def extract_footposer(action_path, config, smpl, skiprate=1):
     uwb_dists = sensor_data['uwb'][sensor_start:sensor_finish, :]
     left_altitude = sensor_data['left_altitude_filtered'][:, np.newaxis]
     right_altitude = sensor_data['right_altitude_filtered'][:, np.newaxis]
-    left_accel = sensor_data['left_accel'][sensor_start: sensor_finish]
-    right_accel = sensor_data['right_accel'][sensor_start: sensor_finish]
     # concat all the fields into left imu, right imu, uwb dists
-    sensor_data = np.concatenate([left_imu, right_imu, uwb_dists, left_altitude, right_altitude, left_accel, right_accel], axis=1)
+    sensor_data = np.concatenate([left_imu, right_imu, uwb_dists, left_altitude, right_altitude], axis=1)
     # convert to torch tensor
     sensor_data = torch.tensor(sensor_data, dtype=torch.float32)
     print(f'sensor data shape {sensor_data.shape}')
@@ -57,11 +55,11 @@ def extract_footposer(action_path, config, smpl, skiprate=1):
     pose = pose.reshape(-1, 3)
     r6d_pose = u.axis_angle_to_r6d(pose)
     r6d_pose = r6d_pose.reshape(-1, 22, 6)
-
     return {
         'x': sensor_data.detach().cpu().type(torch.float32),
         'y': r6d_pose.detach().cpu().type(torch.float32),
         'joints': joints.detach().cpu().type(torch.float32)[:, 0:22, :],
+        'trans': torch.tensor(cdata['trans'])[smpl_start:smpl_finish]
     }
 
 def extract_amass(cdata, smpl, config):
@@ -137,12 +135,14 @@ def extract_amass(cdata, smpl, config):
     # convert angles from axis-angle to r6d
     num_angles = angles.shape[1]
     angles = angles.reshape(-1, 3)
-    angles = utils.axis_angle_to_r6d(angles)
-    angles = angles.reshape(-1, num_angles, 6)
+    angles_rot = R.from_rotvec(angles)
+    angles_matrix = R.as_matrix(angles_rot)
+    # angles = utils.axis_angle_to_r6d(angles)
+    angles = torch.tensor(angles_matrix.reshape(-1, num_angles, 9))
 
     print(f'Angles shape after conversion: {angles.shape}')
 
-    # Reshape angles from (frames, num_angles, 6) to (frames, num_angles * 6)
+    # Reshape angles from (frames, num_angles, 9) to (frames, num_angles * 9)
     angles_reshaped = angles.reshape(angles.shape[0], -1)
 
     # concat so that the shape is (frames, (angle1, angle2, ..., uwb dist 1, uwb dist 2, ..., uwb1 to floor1, uwb2 to floor2))
