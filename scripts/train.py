@@ -55,7 +55,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--finetune",
-        action='store_true',
+        type=str,
         required=False
     )
 
@@ -64,50 +64,36 @@ if __name__ == "__main__":
     # -------------------------------------------------------------------------
     # 2) Use experiment argument in config
     # -------------------------------------------------------------------------
-    # import lib 
     module = importlib.import_module(f"imu_uwb_pose.training.{args.model}")
-
-    # get the model class (assuming the class has the same name as the module)
+    config = c.config(
+            experiment=args.experiment,
+            dataset=args.dataset,
+            lr=args.lr,
+            name=args.loo
+    )
+    experiment = config.experiment
+    checkpoint_path = config.checkpoint_path
     modelClass = getattr(module, args.model)
 
     # Optionally, do something special if --finetune was set:
     if args.finetune:
-        config = c.config(
-            experiment=args.experiment,
-            dataset=args.dataset,
-            lr=args.lr,
-            name=args.loo
-        )
-
         # load the checkpoint path
-        checkpoint_path = config.checkpoint_path
+        pretrain_model_path = config.imu_uwb_pose_model_path / f"pose_models/checkpoints/{args.finetune}"
         # read first line of best model.txt
-        with open(checkpoint_path / "best_model.txt", "r") as f:
+        with open(pretrain_model_path / "best_model.txt", "r") as f:
             lines = f.readlines()
-            checkpoint_path = lines[0].strip()
+            pretrain_model_path = lines[0].strip()
 
         # load the model
         model = modelClass.load_from_checkpoint(
-            checkpoint_path,
+            pretrain_model_path,
             config=config,
             map_location=config.device
         )
-
-        experiment = config.experiment + '-finetune'
-        checkpoint_path = Path(str(config.checkpoint_path) + '-finetune')
-
     else:
-        config = c.config(
-            experiment=args.experiment,
-            dataset=args.dataset,
-            lr=args.lr,
-            name=args.loo
-        )
-        experiment = config.experiment
-        checkpoint_path = config.checkpoint_path
-
-
         model = modelClass(config)
+
+
 
     # set the random seed
     seed_everything(config.torch_seed, workers=True)
@@ -129,7 +115,7 @@ if __name__ == "__main__":
         monitor="validation_step_loss",
         mode="min",
         verbose=False,
-        save_top_k=5,
+        save_top_k=2,
         dirpath=checkpoint_path,
         save_weights_only=True,
         filename='epoch={epoch}-val_loss={validation_step_loss:.5f}'

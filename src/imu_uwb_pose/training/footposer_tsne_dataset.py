@@ -1,8 +1,9 @@
 import torch
 from torch.utils.data import Dataset
 import os
+import re
 
-class footposer_dataset(Dataset):
+class footposer_tsne_dataset(Dataset):
     def __init__(self, config, train=True):
         self.train = train
         self.data = self.load_data(config)
@@ -14,52 +15,45 @@ class footposer_dataset(Dataset):
     
     def load_data(self, config):
         x = []
-        y = []
-        joints = []
+        subject_uid = []
+        motion_uid = []
 
         dir = os.path.join(config.processed_pose, "FootPoser")
 
         if not os.path.exists(dir):
             self.x = x
-            self.y = y
-            self.joints = joints
-
+            self.subject_uid = subject_uid
+            self.motion_uid = motion_uid
             return
 
         subjects = os.listdir(dir)
         for subject in subjects:
-            if (not self.train and subject != config.name and config.name != 'all'):
-                continue
-            if (self.train and (config.name == 'all' or config.name == subject) ):
-                continue
-
             subject_dir = os.path.join(dir, subject)
-
             if not os.path.exists(subject_dir):
                 continue
 
             actions = os.listdir(subject_dir)
 
             for action in actions:
-                # user adaptive
-                # if (not self.train and (subject != config.name or action.find('exercises2') != -1) ):
-                #     continue
-                # if (self.train and subject == config.name and action.find('exercises2') == -1):
-                #     continue
 
                 action_path = os.path.join(subject_dir, action)
                 data = torch.load(action_path, weights_only=True)
 
                 x_split = torch.split(data['x'], config.max_sample_length)
-                y_split = torch.split(data['y'], config.max_sample_length)
-                joint_split = torch.split(data['joints'], config.max_sample_length)
                 x.extend(x_split)
-                y.extend(y_split)
-                joints.extend(joint_split)
+
+                # Extract motion name (e.g., 'activities' from 'activities1.pt')
+                m = re.match(r'^([A-Za-z_]+)(\d+)\.pt$', action)
+                if not m:
+                    raise ValueError(f"Unexpected action filename format: {action}")
+                motion_name = m.group(1)
+
+                motion_uid.extend([config.motion_uids[motion_name]] * len(x_split))
+                subject_uid.extend([config.participant_uids[subject]] * len(x_split))
         self.x = x
-        self.y = y
-        self.joints = joints
+        self.subject_uid = subject_uid
+        self.motion_uid = motion_uid
 
     def __getitem__(self, idx):
         # Extract the angles
-        return (self.x[idx], self.y[idx], self.joints[idx])
+        return (self.x[idx], self.subject_uid[idx], self.motion_uid[idx])

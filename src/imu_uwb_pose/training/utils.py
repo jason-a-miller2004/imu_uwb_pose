@@ -23,6 +23,12 @@ def pad_seq(batch):
     poses = nn.utils.rnn.pad_sequence(poses, batch_first=True)
     return inputs, outputs, poses, input_lens, output_lens
 
+def pad_seq_tsne(batch):
+    xs, subj_ids, motion_ids = zip(*batch)           # tuples
+    lens = [x.shape[0] for x in xs]                  # time lengths
+    xs = nn.utils.rnn.pad_sequence(xs, batch_first=True)
+    return xs, lens, list(subj_ids), list(motion_ids)
+
 def get_dataset(config):
     dataset = config.dataset
     # load the dataset

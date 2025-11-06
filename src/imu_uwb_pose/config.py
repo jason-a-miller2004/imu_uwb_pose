@@ -11,11 +11,15 @@ class config:
         self.experiment = experiment
         self.name = name
         self.lr = lr
+        self.imu_uwb_pose_model_path = Path('/media/lichard/8E98F15098F136F5/imu_uwb_pose_models')
         if self.experiment != None:
-            self.checkpoint_path = self.root_dir / f"pose_models/checkpoints/{self.experiment}"
+            self.checkpoint_path = self.imu_uwb_pose_model_path / f"pose_models/checkpoints/{self.experiment}"
             if self.name:
                 self.checkpoint_path = self.checkpoint_path / f'{self.name}'
             self.checkpoint_path.mkdir(exist_ok=True, parents=True)
+        self.fig_path = self.root_dir / f'figs'
+        self.fig_path.mkdir(exist_ok=True, parents=True)
+
         
     torch_seed = 42
     amass_datasets = ['ACCAD', 'BMLmovi', 'CMU',
@@ -60,3 +64,20 @@ class config:
             [19, 21],
         ])
 
+    motion_uids = {
+        'activities': 0,
+        'gestures': 1,
+        'exercises': 2,
+    }
+
+    participant_uids = {
+        'evan': 0,
+        'helen': 1,
+        'jack': 2,
+        'jason': 3,
+        'jin': 4,
+        'kanav': 5,
+        'maggie': 6,
+        'michelle': 7,
+        'vidya': 8,
+    }

@@ -9,3 +9,4 @@ scripts/.ipynb_checkpoints/
 src/.ipynb_checkpoints/
 .venv
 plots/
+figs/

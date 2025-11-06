@@ -8,14 +8,14 @@
 # ───────────────────────────────────────────────────────────
 
 # ── 1.  Hyper-parameters ──────────────────────────────────
-lrs=(5e-3 1e-4 5e-4 1e-5 5e-5)
-
+lrs=(5e-4 1e-4 5e-5 1e-5)
 subjects=(evan helen jack jason jin kanav maggie michelle vidya)
+pose_model_dir="/media/lichard/8E98F15098F136F5/imu_uwb_pose_models"
 
 # ── 2.  Loop over subjects × learning-rates ───────────────
 for lr in "${lrs[@]}"; do
-    exp_tag="loo_no_pretrain_${lr}"
-    rm -rf ./pose_models/checkpoints/${exp_tag}
+    exp_tag="loo_pretrain_${lr}"
+    rm -rf ${pose_model_dir}/pose_models/checkpoints/${exp_tag}
 
   for subject in "${subjects[@]}"; do
 
@@ -28,7 +28,8 @@ for lr in "${lrs[@]}"; do
       --model "imu_uwb_pose_model" \
       --dataset "footposer_dataset" \
       --lr "${lr}" \
-      --loo "${subject}"
+      --loo "${subject}" \
+      --finetune "best_amass_run"
 
     # ── Test ───────────────────────────────────────────────
     python scripts/test.py \
