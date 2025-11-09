@@ -14,7 +14,7 @@ class imu_uwb_pose_model(pl.LightningModule):
     r"""
     Inputs - global orientation and uwb distances, Outputs - SMPL Pose params (in Rot Matrix)
     """
-    def __init__(self, config:config):
+    def __init__(self, config:config, model=None):
         super().__init__()
         n_input = 6 * len(config.absolute_joint_angles) + len(config.uwb_dists) + len(config.uwb_floor_dists) # add back dist above ground here
 
@@ -25,9 +25,10 @@ class imu_uwb_pose_model(pl.LightningModule):
         n_output = self.n_pose_output
 
         self.batch_size = config.batch_size
-        
-        self.model = RNN(n_input=n_input, n_output=n_output, n_hidden=512, bidirectional=True)
-
+        if not model:
+            self.model = RNN(n_input=n_input, n_output=n_output, n_hidden=512, bidirectional=True)
+        else:
+            self.model = model
         self.config = config
         
         self.body_model = smplx.create(config.body_model, model_type='smplx',

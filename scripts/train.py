@@ -13,6 +13,8 @@ import importlib
 
 from imu_uwb_pose import config as c
 from imu_uwb_pose.training.utils import imu_uwb_data_module as imu_uwb_data_module
+from imu_uwb_pose.training.utils import get_model
+from imu_uwb_pose.training.imu_uwb_pose_model import imu_uwb_pose_model
 from pathlib import Path
 
 if __name__ == "__main__":
@@ -64,7 +66,6 @@ if __name__ == "__main__":
     # -------------------------------------------------------------------------
     # 2) Use experiment argument in config
     # -------------------------------------------------------------------------
-    module = importlib.import_module(f"imu_uwb_pose.training.{args.model}")
     config = c.config(
             experiment=args.experiment,
             dataset=args.dataset,
@@ -73,7 +74,6 @@ if __name__ == "__main__":
     )
     experiment = config.experiment
     checkpoint_path = config.checkpoint_path
-    modelClass = getattr(module, args.model)
 
     # Optionally, do something special if --finetune was set:
     if args.finetune:
@@ -85,13 +85,13 @@ if __name__ == "__main__":
             pretrain_model_path = lines[0].strip()
 
         # load the model
-        model = modelClass.load_from_checkpoint(
+        model = imu_uwb_pose_model.load_from_checkpoint(
             pretrain_model_path,
             config=config,
             map_location=config.device
         )
     else:
-        model = modelClass(config)
+        model = imu_uwb_pose_model(config, get_model(config,args.model))
 
 
 

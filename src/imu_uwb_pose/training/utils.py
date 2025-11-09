@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
+from imu_uwb_pose.training import RNN
 
 def train_val_split(dataset, train_pct):
     # get the train and val split
@@ -50,6 +51,21 @@ def get_dataset(config):
     # split the dataset
     train_dataset, val_dataset = torch.utils.data.random_split(train_dataset, [train_size, val_size])
     return train_dataset, test_dataset, val_dataset
+
+def get_model(config, model_name):
+    n_input = 6 * len(config.absolute_joint_angles) + len(config.uwb_dists) + len(config.uwb_floor_dists)
+    n_output = 132
+    match model_name:
+        case 'bilstm_three_layer':
+            return RNN(n_rnn_layer=1, n_input=n_input, n_output=n_output, n_hidden=512, bidirectional=True)
+        case 'bilstm_two_layer':
+            return RNN(n_rnn_layer=2, n_input=n_input, n_output=n_output, n_hidden=512, bidirectional=True)
+        case 'bilstm_three_layer':
+            return RNN(n_rnn_layers=3, n_input=n_input, n_output=n_output, n_hidden=512, bidirectional=True)
+        case 'bilstm_four_layer':
+            return RNN(n_rnn_layers=4, n_input=n_input, n_output=n_output, n_hidden=512, bidirectional=True)
+        case _:
+            raise ValueError("Not a valid model name")
 
 class imu_uwb_data_module(pl.LightningDataModule):
     def __init__(self, config):
