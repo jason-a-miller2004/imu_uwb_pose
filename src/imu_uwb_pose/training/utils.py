@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
-from imu_uwb_pose.training import RNN
+from imu_uwb_pose.training.RNN import RNN
 
 def train_val_split(dataset, train_pct):
     # get the train and val split
