@@ -4,6 +4,7 @@ import matplotlib
 matplotlib.use("Agg")  # use non-interactive backend for SSH/headless
 import matplotlib.pyplot as plt
 import os
+import argparse
 from torch.utils.data import DataLoader
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
@@ -13,8 +14,13 @@ from imu_uwb_pose.training.footposer_tsne_dataset import footposer_tsne_dataset
 from imu_uwb_pose.training.imu_uwb_pose_model import imu_uwb_pose_model as model
 from imu_uwb_pose.training.utils import pad_seq_tsne
 
-experiment = 'loo_no_pretrain_5e-3'
-name = 'vidya'
+parser = argparse.ArgumentParser(description="t-SNE plotting for FootPoser embeddings")
+parser.add_argument("--experiment", required=True, help="Experiment folder name used for checkpoints and figs")
+parser.add_argument("--name", required=True, help="Run/fold name (e.g., held-out participant)")
+args = parser.parse_args()
+
+experiment = args.experiment
+name = args.name
 config = config(experiment=experiment, name=name, dataset='footposer_tsne_dataset')
 device = config.device
 
