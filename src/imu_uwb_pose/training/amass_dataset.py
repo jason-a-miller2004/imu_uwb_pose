@@ -58,4 +58,4 @@ class amass_dataset(Dataset):
     def __getitem__(self, idx):
         path, start, end = self.samples[idx]
         data = self._load_file(path)
-        return (data['x'][start:end], data['trans'][start:end], data['joints'][start:end])
+        return (data['x'][start:end], data['y'][start:end], data['joints'][start:end])
