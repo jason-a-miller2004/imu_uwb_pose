@@ -37,7 +37,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--loo",
         type=str,
-        required=False,
+        required=True,
         help="test subject to leave out if doing loo cross validation"
     )
 
@@ -98,7 +98,7 @@ if __name__ == "__main__":
     datamodule = imu_uwb_data_module(config)
 
     # set up WandB logger
-    wandb_logger = WandbLogger(project=experiment, save_dir=checkpoint_path)
+    wandb_logger = WandbLogger(project=experiment, save_dir=checkpoint_path, id=args.loo)
 
     # early_stopping_callback = EarlyStopping(
     #     monitor="validation_step_loss",
@@ -130,7 +130,7 @@ if __name__ == "__main__":
     trainer = pl.Trainer(
         fast_dev_run=False,
         logger=wandb_logger,
-        max_epochs=20,
+        max_epochs=10,
         accelerator=accelerator,
         devices=devices,
         callbacks=[checkpoint_callback],
