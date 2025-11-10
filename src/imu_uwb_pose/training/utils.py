@@ -85,6 +85,7 @@ class imu_uwb_data_module(pl.LightningDataModule):
             num_workers=num_workers,
             pin_memory=self.config.pin_memory,
             drop_last=False,
+            prefetch_factor=2
         )
         if num_workers > 0:
             kwargs["persistent_workers"] = self.config.persistent_workers

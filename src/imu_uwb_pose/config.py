@@ -2,6 +2,7 @@ import torch
 from pathlib import Path
 import numpy as np
 import datetime
+import os
 
 class config:
     def __init__(self, experiment=None, dataset=None, lr=1e-3, name=None):

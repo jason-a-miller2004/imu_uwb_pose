@@ -7,6 +7,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning import seed_everything
+import torch
 
 import argparse
 import importlib
@@ -75,6 +76,8 @@ if __name__ == "__main__":
     experiment = config.experiment
     checkpoint_path = config.checkpoint_path
     seed_everything(config.torch_seed, workers=True)
+    torch.set_float32_matmul_precision('high')  # enable TF32
+    torch.backends.cudnn.allow_tf32 = True
 
     # Optionally, do something special if --finetune was set:
     if args.finetune:
