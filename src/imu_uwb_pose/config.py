@@ -20,6 +20,12 @@ class config:
         self.fig_path = self.root_dir / f'figs'
         self.fig_path.mkdir(exist_ok=True, parents=True)
 
+        slurm_workers = os.environ.get("SLURM_CPUS_PER_TASK")
+        fallback_workers = os.cpu_count() or 8
+        self.num_workers = int(slurm_workers) if slurm_workers else fallback_workers
+        self.persistent_workers = self.num_workers > 0
+        self.pin_memory = self.device.type == 'cuda'
+
         
     torch_seed = 42
     amass_datasets = ['ACCAD', 'BMLmovi', 'CMU',

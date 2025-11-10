@@ -74,6 +74,7 @@ if __name__ == "__main__":
     )
     experiment = config.experiment
     checkpoint_path = config.checkpoint_path
+    seed_everything(config.torch_seed, workers=True)
 
     # Optionally, do something special if --finetune was set:
     if args.finetune:
@@ -92,11 +93,6 @@ if __name__ == "__main__":
         )
     else:
         model = imu_uwb_pose_model(config, get_model(config,args.model))
-
-
-
-    # set the random seed
-    seed_everything(config.torch_seed, workers=True)
 
     # instantiate model and data
     datamodule = imu_uwb_data_module(config)
@@ -134,7 +130,7 @@ if __name__ == "__main__":
     trainer = pl.Trainer(
         fast_dev_run=False,
         logger=wandb_logger,
-        max_epochs=10,
+        max_epochs=20,
         accelerator=accelerator,
         devices=devices,
         callbacks=[checkpoint_callback],

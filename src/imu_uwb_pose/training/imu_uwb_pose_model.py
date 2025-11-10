@@ -42,6 +42,7 @@ class imu_uwb_pose_model(pl.LightningModule):
         self.save_hyperparameters()
         
         self.validation_step_outputs = []  # Store validation outputs manually
+        self._smpl_input_cache = {}
 
     def forward(self, inputs, lens):
         pred_pose, _, _ = self.model(inputs, lens)
@@ -64,10 +65,10 @@ class imu_uwb_pose_model(pl.LightningModule):
 
         # convert back to axis-angle format
         pred_pose = pred_pose.reshape(batch_size * self.config.max_sample_length * self.n_output_joints, 6)
-        pred_pose = torch.tensor(r6d_to_axis_angle(pred_pose), dtype=torch.float32).to(self.config.device)
+        pred_pose = r6d_to_axis_angle(pred_pose).to(self.config.device)
         pred_pose = pred_pose.reshape(batch_size * self.config.max_sample_length, self.n_output_joints * 3)
 
-        smpl_input = default_smpl_input(pred_pose.shape[0], self.config)
+        smpl_input = self._get_smpl_input(pred_pose.shape[0])
         smpl_input['global_orient'] = pred_pose[:, :3]
         smpl_input['body_pose'] = pred_pose[:, 3:66]
         # smpl_input['transl'] = pred_pose[:, 66:]
@@ -127,3 +128,9 @@ class imu_uwb_pose_model(pl.LightningModule):
     
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.lr)
+
+    def _get_smpl_input(self, batch_size):
+        if batch_size not in self._smpl_input_cache:
+            self._smpl_input_cache[batch_size] = default_smpl_input(batch_size, self.config)
+        template = self._smpl_input_cache[batch_size]
+        return {k: v.clone() for k, v in template.items()}

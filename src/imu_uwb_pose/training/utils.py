@@ -76,14 +76,28 @@ class imu_uwb_data_module(pl.LightningDataModule):
         self.train_dataset, self.test_dataset, self.val_dataset = get_dataset(self.config)
         print("Done with setup")
 
+    def _loader_kwargs(self, *, shuffle):
+        num_workers = max(0, self.config.num_workers)
+        kwargs = dict(
+            batch_size=self.config.batch_size,
+            collate_fn=pad_seq,
+            shuffle=shuffle,
+            num_workers=num_workers,
+            pin_memory=self.config.pin_memory,
+            drop_last=False,
+        )
+        if num_workers > 0:
+            kwargs["persistent_workers"] = self.config.persistent_workers
+        return kwargs
+
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.config.batch_size, collate_fn=pad_seq, num_workers=16, shuffle=True)
+        return DataLoader(self.train_dataset, **self._loader_kwargs(shuffle=True))
 
     def val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=self.config.batch_size, collate_fn=pad_seq, num_workers=16, shuffle=False)
+        return DataLoader(self.val_dataset, **self._loader_kwargs(shuffle=False))
 
     def test_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=self.config.batch_size, collate_fn=pad_seq, num_workers=16, shuffle=False)
+        return DataLoader(self.test_dataset, **self._loader_kwargs(shuffle=False))
     
     def predict_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=self.config.batch_size, collate_fn=pad_seq, num_workers=16, shuffle=False)
+        return DataLoader(self.test_dataset, **self._loader_kwargs(shuffle=False))

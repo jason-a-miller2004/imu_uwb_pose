@@ -5,35 +5,29 @@ import os
 class footposer_dataset(Dataset):
     def __init__(self, config, train=True):
         self.train = train
-        self.data = self.load_data(config)
         self.config = config
+        self.samples = self._build_index(config)
+        self._cache = {}
         
 
     def __len__(self):
-        return len(self.x)
+        return len(self.samples)
     
-    def load_data(self, config):
-        x = []
-        y = []
-        joints = []
+    def _build_index(self, config):
+        index = []
+        dir_path = os.path.join(config.processed_pose, "FootPoser")
 
-        dir = os.path.join(config.processed_pose, "FootPoser")
+        if not os.path.exists(dir_path):
+            return index
 
-        if not os.path.exists(dir):
-            self.x = x
-            self.y = y
-            self.joints = joints
-
-            return
-
-        subjects = os.listdir(dir)
+        subjects = os.listdir(dir_path)
         for subject in subjects:
             if (not self.train and subject != config.name and config.name != 'all'):
                 continue
             if (self.train and (config.name == 'all' or config.name == subject) ):
                 continue
 
-            subject_dir = os.path.join(dir, subject)
+            subject_dir = os.path.join(dir_path, subject)
 
             if not os.path.exists(subject_dir):
                 continue
@@ -41,25 +35,25 @@ class footposer_dataset(Dataset):
             actions = os.listdir(subject_dir)
 
             for action in actions:
-                # user adaptive
-                # if (not self.train and (subject != config.name or action.find('exercises2') != -1) ):
-                #     continue
-                # if (self.train and subject == config.name and action.find('exercises2') == -1):
-                #     continue
-
                 action_path = os.path.join(subject_dir, action)
-                data = torch.load(action_path, weights_only=True)
+                data = torch.load(action_path, map_location='cpu', weights_only=True)
+                seq_len = data['x'].shape[0]
+                for start in range(0, seq_len, config.max_sample_length):
+                    end = min(start + config.max_sample_length, seq_len)
+                    index.append((action_path, start, end))
+                del data
+        return index
 
-                x_split = torch.split(data['x'], config.max_sample_length)
-                y_split = torch.split(data['y'], config.max_sample_length)
-                joint_split = torch.split(data['joints'], config.max_sample_length)
-                x.extend(x_split)
-                y.extend(y_split)
-                joints.extend(joint_split)
-        self.x = x
-        self.y = y
-        self.joints = joints
+    def _load_file(self, path):
+        if path not in self._cache:
+            data = torch.load(path, map_location='cpu', weights_only=True)
+            for key, value in data.items():
+                if isinstance(value, torch.Tensor):
+                    data[key] = value.share_memory_()
+            self._cache[path] = data
+        return self._cache[path]
 
     def __getitem__(self, idx):
-        # Extract the angles
-        return (self.x[idx], self.y[idx], self.joints[idx])
+        path, start, end = self.samples[idx]
+        data = self._load_file(path)
+        return (data['x'][start:end], data['y'][start:end], data['joints'][start:end])
