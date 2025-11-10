@@ -56,14 +56,14 @@ def get_model(config, model_name):
     n_input = 6 * len(config.absolute_joint_angles) + len(config.uwb_dists) + len(config.uwb_floor_dists)
     n_output = 132
     match model_name:
-        case 'bilstm_three_layer':
+        case 'bilstm_one_layer':
             return RNN(n_rnn_layer=1, n_input=n_input, n_output=n_output, n_hidden=512, bidirectional=True)
         case 'bilstm_two_layer':
             return RNN(n_rnn_layer=2, n_input=n_input, n_output=n_output, n_hidden=512, bidirectional=True)
         case 'bilstm_three_layer':
-            return RNN(n_rnn_layers=3, n_input=n_input, n_output=n_output, n_hidden=512, bidirectional=True)
+            return RNN(n_rnn_layer=3, n_input=n_input, n_output=n_output, n_hidden=512, bidirectional=True)
         case 'bilstm_four_layer':
-            return RNN(n_rnn_layers=4, n_input=n_input, n_output=n_output, n_hidden=512, bidirectional=True)
+            return RNN(n_rnn_layer=4, n_input=n_input, n_output=n_output, n_hidden=512, bidirectional=True)
         case _:
             raise ValueError("Not a valid model name")
 
@@ -77,13 +77,13 @@ class imu_uwb_data_module(pl.LightningDataModule):
         print("Done with setup")
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.config.batch_size, collate_fn=pad_seq, num_workers=8, shuffle=True)
+        return DataLoader(self.train_dataset, batch_size=self.config.batch_size, collate_fn=pad_seq, num_workers=16, shuffle=True)
 
     def val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=self.config.batch_size, collate_fn=pad_seq, num_workers=8, shuffle=False)
+        return DataLoader(self.val_dataset, batch_size=self.config.batch_size, collate_fn=pad_seq, num_workers=16, shuffle=False)
 
     def test_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=self.config.batch_size, collate_fn=pad_seq, num_workers=8, shuffle=False)
+        return DataLoader(self.test_dataset, batch_size=self.config.batch_size, collate_fn=pad_seq, num_workers=16, shuffle=False)
     
     def predict_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=self.config.batch_size, collate_fn=pad_seq, num_workers=8, shuffle=False)
+        return DataLoader(self.test_dataset, batch_size=self.config.batch_size, collate_fn=pad_seq, num_workers=16, shuffle=False)
