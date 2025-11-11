@@ -5,14 +5,20 @@ import datetime
 import os
 
 class config:
-    def __init__(self, experiment=None, dataset=None, lr=1e-3, name=None):
+    def __init__(
+        self,
+        experiment=None,
+        dataset=None,
+        lr=1e-3,
+        name=None,
+    ):
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.root_dir = Path().absolute()
         self.dataset = dataset
         self.experiment = experiment
         self.name = name
         self.lr = lr
-        self.imu_uwb_pose_model_path = Path('/media/lichard/8E98F15098F136F5/imu_uwb_pose_models')
+        self.imu_uwb_pose_model_path = Path('/projects/bfpe/jmiller11')
         if self.experiment != None:
             self.checkpoint_path = self.imu_uwb_pose_model_path / f"pose_models/checkpoints/{self.experiment}"
             if self.name:
@@ -23,7 +29,10 @@ class config:
 
         slurm_workers = os.environ.get("SLURM_CPUS_PER_TASK")
         fallback_workers = os.cpu_count() or 8
-        self.num_workers = int(slurm_workers) if slurm_workers else fallback_workers
+        max_loader_workers = 8
+        available_workers = int(slurm_workers) if slurm_workers else fallback_workers
+        self.max_loader_workers = max_loader_workers
+        self.num_workers = min(available_workers, max_loader_workers)
         self.persistent_workers = self.num_workers > 0
         self.pin_memory = self.device.type == 'cuda'
 
@@ -33,9 +42,9 @@ class config:
                   'DanceDB', 'DFaust', 'EKUT', 'Eyes_Japan_Dataset', 'HDM05', 'HUMAN4D', 'HumanEva', 'KIT', 'MoSh', 'PosePrior', 'SFU', 'SOMA', 'SSM', 'TCDHands', 'TotalCapture', 'Transitions']
     
     raw_amass = '/media/lichard/8E98F15098F136F5/amass'
-    raw_footposer = './data/raw/FootPoser_filtered'
-    processed_pose = './data/processed'
-    body_model = './body_models'
+    raw_footposer = '/projects/bfpe/jmiller11/data/raw/FootPoser_filtered'
+    processed_pose = '/projects/bfpe/jmiller11/data/processed'
+    body_model = '/projects/bfpe/jmiller11/body_models'
     absolute_joint_angles = [7, 8] # left and right joint angles
     uwb_dists = [(7,8)]
     uwb_floor_dists = [7,8]
@@ -44,7 +53,8 @@ class config:
 
     # done with 30 fps in mind. If fps is different, change this value
     max_sample_length = 150
-    batch_size = 32
+    batch_size = 64
+    max_loader_workers = 8
 
     def get_smpl_skeleton(self):
         return torch.tensor([
