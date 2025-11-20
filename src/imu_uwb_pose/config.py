@@ -43,6 +43,7 @@ class config:
     raw_footposer = '/projects/bfpe/jmiller11/data/raw/FootPoser_filtered'
     processed_pose = '/projects/bfpe/jmiller11/data/processed'
     body_model = '/projects/bfpe/jmiller11/body_models'
+    cache_dir = '.'
     absolute_joint_angles = [7, 8] # left and right joint angles
     uwb_dists = [(7,8)]
     uwb_floor_dists = [7,8]
