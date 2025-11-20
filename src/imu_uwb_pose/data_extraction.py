@@ -9,6 +9,49 @@ from imu_uwb_pose import config as c, utils as u
 import os
 import pickle
 
+def extract_footposer_mocap(action_path, config, smpl, skiprate=1):
+    files = os.listdir(action_path)
+
+    # extract the align.csv
+    align_file = [f for f in files if f.endswith("align.csv")][0]
+    align_path = os.path.join(action_path, align_file)
+    print("align path", align_path)
+    data = np.loadtxt(align_path, delimiter=',')
+    smpl_start, smpl_finish = int(data[0]), int(data[1])
+    mocap_file = [f for f in files if f.endswith("stageii.pkl")][0]
+    mocap_path = os.path.join(action_path, mocap_file)
+
+    cdata = np.load(mocap_path, allow_pickle=True)
+    pose = cdata['fullpose'].astype(np.float32)
+    tran = cdata['trans'][::skiprate].astype(np.float32)
+
+
+    # currently at 120hz resample to 30hz
+    pose = torch.tensor(pose[::skiprate, :66])
+    tran = torch.tensor(tran)[smpl_start:smpl_finish,:]
+
+    pose = pose[smpl_start:smpl_finish, :]
+
+    print(f'pose shape {pose.shape}')
+    vertices,joints,faces = u.get_smpl_output(smpl, pose, config)
+    _,trans_joints,_ = u.get_smpl_output(smpl, pose,config, tran)
+    # angles
+    angles = extract_angle_amass(pose, config).reshape(-1, 6 * len(config.absolute_joint_angles))
+    uwb_dists = extract_uwb_amass(joints, config).reshape(-1, len(config.uwb_dists))
+    floor_dists = extract_dist_floor_amass(trans_joints, config).reshape(-1, len(config.uwb_floor_dists))
+
+    pose = pose.reshape(-1, 3)
+    r6d_pose = u.axis_angle_to_r6d(pose)
+    r6d_pose = r6d_pose.reshape(-1, 22, 6)
+
+    x = torch.concatenate((angles, uwb_dists, floor_dists),dim=1)
+    return {
+        'x': x.detach().cpu().type(torch.float32),
+        'y': r6d_pose.detach().cpu().type(torch.float32),
+        'joints': joints.detach().cpu().type(torch.float32)[:, 0:22, :],
+        'trans': torch.tensor(cdata['trans'])
+    }
+
 def extract_footposer(action_path, config, smpl, skiprate=1):
     files = os.listdir(action_path)
 
@@ -176,14 +219,8 @@ def extract_angle_amass(pose, config, all=False):
     """
     Extract the angles from the AMASS dataset
     """
-    axis_angle_pose = pose[:,0:66].reshape(-1, 3).cpu().numpy()
-    
-    # only keep body components
-    rotation = R.from_rotvec(axis_angle_pose)
-
-    # convert relative joint angles to rotation matrix representation
-    r_matrix = torch.tensor(rotation.as_matrix()).to(config.device)
-
+    axis_angle_pose = pose[:,0:66].reshape(-1, 3)
+    r_matrix = u.axis_angle_to_rotation_matrix(axis_angle_pose)
     # get the parent array
     parent = utils.get_parent_array(config.get_smpl_skeleton(), config)
     # calculate the global angle
@@ -198,13 +235,8 @@ def extract_angle_amass(pose, config, all=False):
         num_joints = 22
 
     selected_rotations = selected_rotations.reshape(-1,3,3)
-    # convert back to axis-angle representation
-    selected_rotations = R.from_matrix(selected_rotations.cpu().numpy())
-    selected_rotations = selected_rotations.as_rotvec()
-
-    selected_rotations = torch.tensor(selected_rotations.reshape(-1, num_joints, 3))
-
-    return selected_rotations
+    r6d_angles = u.rotation_matrix_to_r6d(selected_rotations)
+    return r6d_angles
 
 def extract_uwb_amass(joints, config):
     """

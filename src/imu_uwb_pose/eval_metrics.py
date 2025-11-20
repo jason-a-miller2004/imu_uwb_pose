@@ -1,6 +1,6 @@
 import imu_uwb_pose.data_extraction as de
 import imu_uwb_pose.config as c
-from imu_uwb_pose.utils import default_smpl_input, r6d_to_axis_angle
+from imu_uwb_pose.utils import default_smpl_input, r6d_to_axis_angle, r6d_to_rotation_matrix, rotation_matrix_to_axis_angle
 from scipy.spatial.transform import Rotation as R
 # import open3d as o3d
 import numpy as np
@@ -15,35 +15,21 @@ def mean_joint_angle_error(pred, gt, lengths, config):
     pred = pred.reshape(-1, 66)
     gt = gt.reshape(-1, 66)
 
-    pred_orient = de.extract_angle_amass(pred, config, True).cpu().numpy()
-    gt_orient = de.extract_angle_amass(gt, config, True).cpu().numpy()
-
-    pred_orient = pred_orient.reshape(-1, 3)
-    gt_orient = gt_orient.reshape(-1, 3)
-
-    # convert to rotation matrix
-    pred_rot = R.from_rotvec(pred_orient)
-    gt_rot = R.from_rotvec(gt_orient)
-
-    pred_orient = R.as_matrix(pred_rot)
-    gt_orient = R.as_matrix(gt_rot)
+    pred_orient = r6d_to_rotation_matrix(de.extract_angle_amass(pred, config, True))
+    gt_orient = r6d_to_rotation_matrix(de.extract_angle_amass(gt, config, True))
     
     # get the relative rotation matrix
     pred_rot_matrix = pred_orient.reshape(-1, 3, 3)
     gt_rot_matrix = gt_orient.reshape(-1, 3, 3)
 
     # Transpose gt matrices
-    gt_trans = np.transpose(gt_rot_matrix, [0, 2, 1])
+    gt_trans = gt_rot_matrix.transpose(1, 2)
 
     # compute R1 * R2.T, if prediction and target match, this will be the identity matrix
-    r = np.matmul(pred_rot_matrix, gt_trans)
+    r = torch.matmul(pred_rot_matrix, gt_trans)
     angles = []
     # Convert rotation matrix to axis angle representation and find the angle
-    for i in range(r.shape[0]):
-        aa = R.from_matrix(r[i, :, :]).as_rotvec()
-        angles.append(np.linalg.norm(aa))
-
-    angles = np.array(angles)
+    angles = torch.linalg.norm(rotation_matrix_to_axis_angle(r),dim=1)
     angles = angles.reshape(-1, config.max_sample_length, 22)
     # Initialize accumulator for each of the 22 joints
 
@@ -65,7 +51,7 @@ def mean_joint_angle_error(pred, gt, lengths, config):
     # plt.legend()
     # plt.show()
 
-    sums = np.zeros(22, dtype=float)
+    sums = torch.zeros(22, dtype=float, device=config.device)
     
     # Accumulate the sum of angles per joint
     for i in range(angles.shape[0]):
@@ -74,7 +60,7 @@ def mean_joint_angle_error(pred, gt, lengths, config):
     
     # Divide by the total number of frames across all samples
     total_frames = np.sum(lengths)
-    means = sums / total_frames
+    means = sums.cpu().numpy() / total_frames
 
     return means
 

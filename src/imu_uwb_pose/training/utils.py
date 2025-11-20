@@ -3,6 +3,7 @@ import torch.nn as nn
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 from imu_uwb_pose.training.RNN import RNN
+from imu_uwb_pose.training.MLP import MLP
 
 def train_val_split(dataset, train_pct):
     # get the train and val split
@@ -64,6 +65,8 @@ def get_model(config, model_name):
             return RNN(n_rnn_layer=3, n_input=n_input, n_output=n_output, n_hidden=512, bidirectional=True)
         case 'bilstm_four_layer':
             return RNN(n_rnn_layer=4, n_input=n_input, n_output=n_output, n_hidden=512, bidirectional=True)
+        case 'mlp':
+            return MLP(n_input, n_output)
         case _:
             raise ValueError("Not a valid model name")
 
