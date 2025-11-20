@@ -29,10 +29,8 @@ class config:
 
         slurm_workers = os.environ.get("SLURM_CPUS_PER_TASK")
         fallback_workers = os.cpu_count() or 8
-        max_loader_workers = 8
         available_workers = int(slurm_workers) if slurm_workers else fallback_workers
-        self.max_loader_workers = max_loader_workers
-        self.num_workers = min(available_workers, max_loader_workers)
+        self.num_workers = available_workers - 2
         self.persistent_workers = self.num_workers > 0
         self.pin_memory = self.device.type == 'cuda'
 
