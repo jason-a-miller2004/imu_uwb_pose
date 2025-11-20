@@ -4,6 +4,7 @@ import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 from imu_uwb_pose.training.RNN import RNN
 from imu_uwb_pose.training.MLP import MLP
+from imu_uwb_pose.training.Transformer import PoseTransformer
 
 def train_val_split(dataset, train_pct):
     # get the train and val split
@@ -67,6 +68,8 @@ def get_model(config, model_name):
             return RNN(n_rnn_layer=4, n_input=n_input, n_output=n_output, n_hidden=512, bidirectional=True)
         case 'mlp':
             return MLP(n_input, n_output)
+        case 'transformer':
+            return PoseTransformer(n_input, n_output)
         case _:
             raise ValueError("Not a valid model name")
 
@@ -88,7 +91,7 @@ class imu_uwb_data_module(pl.LightningDataModule):
             num_workers=num_workers,
             pin_memory=self.config.pin_memory,
             drop_last=False,
-            prefetch_factor=2
+            prefetch_factor=4
         )
         if num_workers > 0:
             kwargs["persistent_workers"] = self.config.persistent_workers

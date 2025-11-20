@@ -25,7 +25,7 @@ class PoseTransformer(pl.LightningModule):
         self.output_proj = nn.Linear(d_model, output_dim)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x):
+    def forward(self, x, x_lens):
         """
         Forward pass for the model.
         Args:
@@ -43,4 +43,4 @@ class PoseTransformer(pl.LightningModule):
         enc_out = self.transformer_encoder(x_emb) 
         # 4. Project each time step embedding to output pose dimensions
         output = self.output_proj(enc_out)  # shape: (B, T, output_dim)
-        return output
+        return output,x_lens,None
